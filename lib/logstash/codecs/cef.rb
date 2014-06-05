@@ -1,17 +1,13 @@
 require "logstash/codecs/base"
 require "logstash/codecs/line"
 
-class LogStash::Codecs::EDNLines < LogStash::Codecs::Base
+class LogStash::Codecs::CEF < LogStash::Codecs::Base
   config_name "cef"
 
   milestone 1
 
   # Specify if the Syslog header will be expected
-  config :syslog, :validate => :boolean, :default => true
-
-  def register
-    require "cef"
-  end
+  config :syslog, :validate => :boolean, :default => false
 
   public
   def initialize(params={})
@@ -22,6 +18,7 @@ class LogStash::Codecs::EDNLines < LogStash::Codecs::Base
   def decode(data)
     # Need to break out the headers, then return the headers as individual fields, and the extension to be processed by a filter (ie: KV)
     # %{SYSLOGDATE} %{HOST} CEF:Version|Device Vendor|Device Product|Device Version|SignatureID|Name|Severity|Extension
+    event = LogStash::Event.new()
     if @syslog
         @logger.debug("Expecting SYSLOG headers")
         event['syslog'], data = data.split('CEF:', 1)
@@ -32,12 +29,12 @@ class LogStash::Codecs::EDNLines < LogStash::Codecs::Base
     end #if @syslog
     # Now, break out the rest of the headers
     event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], event['message'] =  data.scan /(?:[^\|\\]|\\.)+/
-    yeild LogStash::Event.new(event)
+    yield event
   end
 
-  public
-  def encode(data)
+#  public
+#  def encode(data)
 	# Do stuff here
-  end
+#  end
 
 end
