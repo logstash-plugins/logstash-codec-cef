@@ -9,6 +9,12 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Specify if the Syslog header will be expected
   config :syslog, :validate => :boolean, :default => false
 
+  config :signature, :validate => :string, :default => "Logstash"
+  config :name, :validate => :string, :default => "Logstash"
+  config :sev, :validate => :number, :default => 6
+
+  config :fields, :validate => :array
+
   public
   def initialize(params={})
     super(params)
@@ -32,9 +38,29 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     yield event
   end
 
-#  public
-#  def encode(data)
-	# Do stuff here
-#  end
+  public
+  def encode(data)
+	# "CEF:0|Elasticsearch|Logstash|1.0|Signature|Name|Sev|"
+
+	# TODO: Need to check that fields are set!
+
+	# Signature, Name, and Sev should be set in the config, with ref to fields
+	# Should also probably set the fields sent
+	header = ["CEF:0", "Elasticsearch", "Logstash", "1.0", @signature, @name, @sev].join("|")
+	values = @fields.map {|name| get_value(name, data)}.join(" ")
+	# values = values.map {|k,v| "#{k}=#{v}"}.join(" ")
+	@on_event.call(header + " " + values + "\n")
+  end
+
+  private
+  def get_value(name, event)
+    val = event[name]
+    case val
+      when Hash
+        return name + "=" + val.to_json
+      else
+        return name + "=" + val
+    end
+  end
 
 end
