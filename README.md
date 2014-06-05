@@ -1,4 +1,4 @@
-logstash-cif
+logstash-CEF
 ============
 
 Logstash Codec to handle CEF encoded data
