@@ -27,7 +27,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     event = LogStash::Event.new()
     if @syslog
         @logger.debug("Expecting SYSLOG headers")
-        event['syslog'], data = data.split('CEF:', 1)
+        event['syslog'], data = data.split('CEF:', 2)
         # Since we have the syslog headers, lets pull them out first and put them into their own field to be handled
     else 
         # We don't have syslog headers, so we just need to remove CEF:
