@@ -19,7 +19,8 @@ class LogStash::Filters::CEF < LogStash::Filters::Base
     head, data = data.split('CEF:', 2)
     if @syslog
         @logger.debug("Expecting SYSLOG headers")
-        event['syslog'] = head
+        event['syslog_header'] = head.strip
+        event['syslog_timestamp'], event['syslog_hostname'] = /(.*) (\S+) $/.match(head).captures
     end #if @syslog
     # Now, break out the rest of the headers
     event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], message =  data.scan /(?:[^\|\\]|\\.)+/
@@ -32,7 +33,7 @@ class LogStash::Filters::CEF < LogStash::Filters::Base
       kv = Hash[*message]
       @logger.debug(kv)
       addKey(kv,key,value)
-      event.to_hash.merge!(Hash[kv.map{|k,v| ["cef_ext_"+k,v]}])
+      event.to_hash.merge!(Hash[kv.map{ |k,v| ["cef_ext_"+k,v] }])
     end #
     filter_matched(event)  
   end
