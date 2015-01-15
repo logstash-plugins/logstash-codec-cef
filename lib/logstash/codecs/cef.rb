@@ -1,5 +1,4 @@
 require "logstash/codecs/base"
-require "logstash/codecs/line"
 
 class LogStash::Codecs::CEF < LogStash::Codecs::Base
   config_name "cef"
