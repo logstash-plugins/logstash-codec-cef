@@ -32,8 +32,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
         data.sub! /^CEF:/, ''
     end #if @syslog
     # Now, break out the rest of the headers
-    event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], message =  data.scan /(?:[^\|\\]|\\.)+/
+    event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], event['message'] =  data.scan /(?:[^\|\\]|\\.)+/
     # Now, try to break out the Extension Dictionary
+    message=event['message']
     if message.to_s.strip.length != 0
       message = message.split(/ ([\w\.]+)=/)
 
