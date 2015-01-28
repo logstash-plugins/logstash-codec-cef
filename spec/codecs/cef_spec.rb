@@ -30,7 +30,14 @@ describe LogStash::Codecs::CEF do
       end
     end
 
-    it "should parse the cef body"
+    it "should parse the cef body" do
+      subject.decode(message) do |e|
+        insist { e["cef_ext_src"] } == "10.0.0.192"
+        insist { e["cef_ext_dst"] } == "12.121.122.82"
+        insist { e["cef_ext_spt"] } == "1232"
+      end
+    end
+
     it "should handle values in the body that contain spaces"
   end
 
