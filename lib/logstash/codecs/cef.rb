@@ -36,6 +36,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     # Now, try to break out the Extension Dictionary
     message=event['message']
     if message.to_s.strip.length != 0
+      message = message.strip
       message = message.split(/ ([\w\.]+)=/)
 
       key, value = message.shift.split('=',2)
