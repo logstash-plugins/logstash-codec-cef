@@ -31,6 +31,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       # We don't have syslog headers, so we just need to remove CEF:
       data.sub! /^CEF:/, ''
     end #if @syslog
+    # Default any CEF unknown fields to unknown
+    data.gsub! '||', ''
+
     # Now, break out the rest of the headers
     event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], event['message'] =  data.scan /(?:[^\|\\]|\\.)+/
     # Now, try to break out the Extension Dictionary
