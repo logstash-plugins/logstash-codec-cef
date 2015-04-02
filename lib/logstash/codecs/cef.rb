@@ -2,11 +2,6 @@ require "logstash/codecs/base"
 
 class LogStash::Codecs::CEF < LogStash::Codecs::Base
   config_name "cef"
-
-
-  # Specify if the Syslog header will be expected
-  config :syslog, :validate => :boolean, :default => false
-
   config :signature, :validate => :string, :default => "Logstash"
   config :name, :validate => :string, :default => "Logstash"
   config :sev, :validate => :number, :default => 6
@@ -20,31 +15,44 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
   public
   def decode(data)
-    # Need to break out the headers, then return the headers as individual fields, and the extension to be processed by a filter (ie: KV)
-    # %{SYSLOGDATE} %{HOST} CEF:Version|Device Vendor|Device Product|Device Version|SignatureID|Name|Severity|Extension
-    event = LogStash::Event.new()
-    if @syslog
-      @logger.debug("Expecting SYSLOG headers")
-      event['syslog'], data = data.split('CEF:', 2)
-      # Since we have the syslog headers, lets pull them out first and put them into their own field to be handled
-    else 
-      # We don't have syslog headers, so we just need to remove CEF:
-      data.sub! /^CEF:/, ''
-    end #if @syslog
-    # Now, break out the rest of the headers
-    event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], event['message'] =  data.scan /(?:[^\|\\]|\\.)+/
-    # Now, try to break out the Extension Dictionary
-    message=event['message']
-    if message.to_s.strip.length != 0
-      message = message.split(/ ([\w\.]+)=/)
+    # Strip any quotations at the start and end, flex connectors seem to send this
+    if data[0] == "\""
+      data = data[1..-2]
+    end
+    event = LogStash::Event.new
 
-      key, value = message.shift.split('=',2)
-      @logger.debug(message)
-      kv = Hash[*message]
-      @logger.debug(kv)
-      addKey(kv,key,value)
-      event.to_hash.merge!(Hash[kv.map{ |k,v| ["cef_ext_"+k,v] }])
-    end #
+    # Split by the pipes
+    event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], message = data.split /(?<!\\)[\|]/
+
+    # Try and parse out the syslog header if there is one
+    if event['cef_version'].include? ' '
+      event['syslog'], unused, event['cef_version'] = event['cef_version'].rpartition(' ')
+    end
+
+    # Get rid of the CEF bit in the version
+    event['cef_version'].sub! /^CEF:/, ''
+
+    # Strip any whitespace from the message
+    if not message.nil? and message.include? '='
+      message = message.strip
+
+      # If the last KVP has no value, add an empty string, this prevents hash errors below
+      if message.end_with?("=")
+        message=message + ' '
+      end
+
+      # Now parse the key value pairs into it
+      extensions = {}
+      message = message.split(/ ([\w\.]+)=/)
+      key, value = message.shift.split('=', 2)
+      extensions[key] = value
+
+      Hash[*message].each{ |k, v| extensions[k] = v }
+
+      # And save the new has as the extensions
+      event['cef_ext'] = extensions
+    end
+
     yield event
   end
 
@@ -61,19 +69,6 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     # values = values.map {|k,v| "#{k}=#{v}"}.join(" ")
     @on_event.call(header + " " + values + "\n")
   end
-
-  private
-  def addKey(kv_keys, key, value)
-    if kv_keys.has_key?(key)
-      if kv_keys[key].is_a? Array
-        kv_keys[key].push(value)
-      else
-        kv_keys[key] = [kv_keys[key], value]
-      end
-    else
-      kv_keys[key] = value
-    end
-  end # addKey
 
   private
   def get_value(name, event)
