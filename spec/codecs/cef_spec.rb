@@ -18,17 +18,17 @@ describe LogStash::Codecs::CEF do
 
         def validate(e) 
             insist { e.is_a?(LogStash::Event) }
-            insist { e["cef_version"] } == "0"
-            insist { e["cef_device_version"] } == "1.0"
-            insist { e["cef_sigid"] } == "100"
-            insist { e["cef_name"] } == "trojan successfully stopped"
-            insist { e["cef_severity"] } == "10"
-            insist { e["message"] } == "src=10.0.0.192 dst=12.121.122.82 spt=1232"
+            insist { e['cef_version'] } == "0"
+            insist { e['cef_device_version'] } == "1.0"
+            insist { e['cef_sigid'] } == "100"
+            insist { e['cef_name'] } == "trojan successfully stopped"
+            insist { e['cef_severity'] } == "10"
         end
 
         it "should parse the cef headers" do
             subject.decode(message) do |e|
                 validate(e)
+                ext = e['cef_extension']
                 insist { e["cef_vendor"] } == "security"
                 insist { e["cef_product"] } == "threatmanager"
             end
@@ -36,9 +36,10 @@ describe LogStash::Codecs::CEF do
 
         it "should parse the cef body" do
             subject.decode(message) do |e|
-                insist { e["cef_ext_src"] } == "10.0.0.192"
-                insist { e["cef_ext_dst"] } == "12.121.122.82"
-                insist { e["cef_ext_spt"] } == "1232"
+                ext = e['cef_extension']
+                insist { ext['src'] } == "10.0.0.192"
+                insist { ext['dst'] } == "12.121.122.82"
+                insist { ext['spt'] } == "1232"
             end
         end
 
@@ -51,18 +52,26 @@ describe LogStash::Codecs::CEF do
             end 
         end
 
-        let (:leading_whitespace) { "CEF:0|security|threatmaager|1.0|100|trojan successfully stopped|10| src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+        let (:leading_whitespace) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10| src=10.0.0.192 dst=12.121.122.82 spt=1232" }
         it "should strip leading whitespace from the message" do
             subject.decode(leading_whitespace) do |e|
                 validate(e)
             end 
         end
 
-
-        let (:escaped_pipes) { 'CEF:0|||1.0|100|trojan successfully stopped|10|moo=this\|has an escaped pipe' }
+        let (:escaped_pipes) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this\|has an escaped pipe' }
         it "should be OK with escaped pipes in the message" do
             subject.decode(escaped_pipes) do |e|
-                insist { e["message"] } == 'moo=this\|has an escaped pipe'
+                ext = e['cef_extension']
+                insist { ext['moo'] } == 'this\|has an escaped pipe'
+            end 
+        end
+
+        let (:syslog) { "Syslogdate Sysloghost CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+        it "Should detect headers before CEF starts" do
+            subject.decode(syslog) do |e|
+                validate(e)
+                insist { e['syslog'] } == 'Syslogdate Sysloghost '
             end 
         end
 
