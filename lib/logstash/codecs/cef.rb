@@ -2,11 +2,7 @@ require "logstash/codecs/base"
 
 class LogStash::Codecs::CEF < LogStash::Codecs::Base
   config_name "cef"
-
-
-  # Specify if the Syslog header will be expected
   config :syslog, :validate => :boolean, :default => false
-
   config :signature, :validate => :string, :default => "Logstash"
   config :name, :validate => :string, :default => "Logstash"
   config :sev, :validate => :number, :default => 6
@@ -20,7 +16,6 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
   public
   def decode(data)
-    # Need to break out the headers, then return the headers as individual fields, and the extension to be processed by a filter (ie: KV)
     # %{SYSLOGDATE} %{HOST} CEF:Version|Device Vendor|Device Product|Device Version|SignatureID|Name|Severity|Extension
     event = LogStash::Event.new()
     if @syslog
@@ -30,17 +25,13 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     else 
       # We don't have syslog headers, so we just need to remove CEF:
       data.sub! /^CEF:/, ''
-    end #if @syslog
+    end 
 
-    # Default any CEF unknown fields to unknown
-    data.gsub! '||', '|unknown|'
+    # Get the headers
+    event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], event['message'] =  data.split /(?<!\\)[\|]/
 
-    # Now, break out the rest of the headers
-    event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], event['message'] =  data.scan /(?:[^\|\\]|\\.)+/
-
-    # Strip any leading or trailing spaces
-    message=event['message']
-    message=message.to_s.strip
+    # Strip any whitespace from the message 
+    message=event['message'].to_s.strip
     event['message']=message
 
     # Now, try to break out the Extension Dictionary

@@ -3,3 +3,5 @@ vendor
 tools
 .VERSION.mk
 *.gem
+*.lock
+*.swp

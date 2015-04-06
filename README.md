@@ -15,7 +15,16 @@ Logstash provides infrastructure to automatically generate documentation for thi
 
 Need help? Try #logstash on freenode IRC or the logstash-users@googlegroups.com mailing list.
 
-## Developing
+## Developing with Docker
+You can use a docker container with all of the requirements pre installed to save you installing the development environment on your host.
+
+### 1. Starting the container
+Simply type `docker-compose run devenv` and you'll be entered into the container.  Then you'll need to do `jruby -S bundle install` to get all the dependencies down.
+
+### 2. Running tests
+Once you've done #1 above, you can run your tests with `jruby -S bundle exec rspec`
+
+## Developing without Docker
 
 ### 1. Plugin Developement and Testing
 
