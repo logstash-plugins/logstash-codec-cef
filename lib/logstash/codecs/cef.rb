@@ -36,7 +36,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       }
 
       # And save the new has as the extensions
-      event['cef_extension'] = extensions
+      event['cef_ext'] = extensions
     end
     yield event
   end

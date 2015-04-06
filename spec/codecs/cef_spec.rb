@@ -28,7 +28,7 @@ describe LogStash::Codecs::CEF do
         it "should parse the cef headers" do
             subject.decode(message) do |e|
                 validate(e)
-                ext = e['cef_extension']
+                ext = e['cef_ext']
                 insist { e["cef_vendor"] } == "security"
                 insist { e["cef_product"] } == "threatmanager"
             end
@@ -36,7 +36,7 @@ describe LogStash::Codecs::CEF do
 
         it "should parse the cef body" do
             subject.decode(message) do |e|
-                ext = e['cef_extension']
+                ext = e['cef_ext']
                 insist { ext['src'] } == "10.0.0.192"
                 insist { ext['dst'] } == "12.121.122.82"
                 insist { ext['spt'] } == "1232"
@@ -62,7 +62,7 @@ describe LogStash::Codecs::CEF do
         let (:escaped_pipes) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this\|has an escaped pipe' }
         it "should be OK with escaped pipes in the message" do
             subject.decode(escaped_pipes) do |e|
-                ext = e['cef_extension']
+                ext = e['cef_ext']
                 insist { ext['moo'] } == 'this\|has an escaped pipe'
             end 
         end
