@@ -36,7 +36,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     message = message.to_s.strip
 
     # If the last KVP has no value, add an empty string, this prevents hash errors below
-    if message[-1, 1] == "="
+    if message.end_with?("=")
       message=message + ' '
     end
 
