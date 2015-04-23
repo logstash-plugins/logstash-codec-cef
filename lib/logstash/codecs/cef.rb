@@ -17,10 +17,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   def decode(data)
     # Strip any quotations at the start and end, flex connectors seem to send this
     if data[0] == "\""
-      data = data[0..-2]
-      data.slice!(0)
+      data = data[1..-2]
     end
-    event = LogStash::Event.new()
+    event = LogStash::Event.new
 
     # Split by the pipes
     event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], message = data.split /(?<!\\)[\|]/
