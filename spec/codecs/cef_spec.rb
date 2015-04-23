@@ -71,7 +71,7 @@ describe LogStash::Codecs::CEF do
     it "Should detect headers before CEF starts" do
       subject.decode(syslog) do |e|
         validate(e)
-        insist { e['syslog'] } == 'Syslogdate Sysloghost '
+        insist { e['syslog'] } == 'Syslogdate Sysloghost'
       end 
     end
 

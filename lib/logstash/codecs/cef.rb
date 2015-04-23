@@ -26,7 +26,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
     # Try and parse out the syslog header if there is one
     if event['cef_version'].include? ' '
-      event['syslog'], event['cef_version'] = event['cef_version'].split(' ')
+      event['syslog'], unused, event['cef_version'] = event['cef_version'].rpartition(' ')
     end
 
     # Get rid of the CEF bit in the version
