@@ -43,6 +43,14 @@ describe LogStash::Codecs::CEF do
       end
     end
 
+    let (:no_ext) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|" }
+    it "should be OK with no extension dictionary" do
+      subject.decode(no_ext) do |e|
+        validate(e)
+        insist { e["cef_ext"] } == nil
+      end 
+    end
+
     let (:missing_headers) { "CEF:0|||1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
     it "should be OK with missing CEF headers (multiple pipes in sequence)" do
       subject.decode(missing_headers) do |e|

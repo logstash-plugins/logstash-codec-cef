@@ -33,25 +33,26 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     event['cef_version'].sub! /^CEF:/, ''
 
     # Strip any whitespace from the message
-    message = message.to_s.strip
+    if not message.nil? and message.include? '='
+      message = message.strip
 
-    # If the last KVP has no value, add an empty string, this prevents hash errors below
-    if message.end_with?("=")
-      message=message + ' '
-    end
+      # If the last KVP has no value, add an empty string, this prevents hash errors below
+      if message.end_with?("=")
+        message=message + ' '
+      end
 
-    # Now parse the key value pairs into it
-    extensions = {}
-    if message.length != 0 and message.include? "="
+      # Now parse the key value pairs into it
+      extensions = {}
       message = message.split(/ ([\w\.]+)=/)
       key, value = message.shift.split('=', 2)
       extensions[key] = value
 
-      Hash[*message].each{|k, v| extensions[k] = v }
+      Hash[*message].each{ |k, v| extensions[k] = v }
 
       # And save the new has as the extensions
       event['cef_ext'] = extensions
     end
+
     yield event
   end
 
