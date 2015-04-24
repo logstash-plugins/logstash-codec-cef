@@ -47,9 +47,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       key, value = message.shift.split('=', 2)
       extensions[key] = value
 
-      Hash[*message].each{|k, v| 
-        extensions[k] = v
-      }
+      Hash[*message].each{|k, v| extensions[k] = v }
 
       # And save the new has as the extensions
       event['cef_ext'] = extensions
