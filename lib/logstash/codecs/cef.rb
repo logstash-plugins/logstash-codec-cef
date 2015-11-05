@@ -22,8 +22,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     event = LogStash::Event.new
 
     # Split by the pipes
-    event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], message = data.split /(?<!\\)[\|]/
-
+    event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], *message = data.split /(?<!\\)[\|]/
+    message = message.join()
     # Try and parse out the syslog header if there is one
     if event['cef_version'].include? ' '
       event['syslog'], unused, event['cef_version'] = event['cef_version'].rpartition(' ')
