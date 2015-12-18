@@ -10,7 +10,208 @@ describe LogStash::Codecs::CEF do
   end
 
   context "#encode" do
-    it "should assert all header fields are present"
+    subject(:codec) { LogStash::Codecs::CEF.new }
+
+    let(:results)   { [] }
+
+    it "should assert all header fields are present" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.fields = []
+      event = LogStash::Event.new("foo" => "bar")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|$/m)
+    end
+
+    it "should use default values for empty header fields" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.vendor = ""
+      codec.product = ""
+      codec.version = ""
+      codec.signature = ""
+      codec.name = ""
+      codec.sev = ""
+      codec.fields = []
+      event = LogStash::Event.new("foo" => "bar")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|$/m)
+    end
+
+    it "should use configured values for header fields" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.vendor = "vendor"
+      codec.product = "product"
+      codec.version = "2.0"
+      codec.signature = "signature"
+      codec.name = "name"
+      codec.sev = "1"
+      codec.fields = []
+      event = LogStash::Event.new("foo" => "bar")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|vendor\|product\|2.0\|signature\|name\|1\|$/m)
+    end
+
+    it "should use sprintf for header fields" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.vendor = "%{vendor}"
+      codec.product = "%{product}"
+      codec.version = "%{version}"
+      codec.signature = "%{signature}"
+      codec.name = "%{name}"
+      codec.sev = "%{sev}"
+      codec.fields = []
+      event = LogStash::Event.new("vendor" => "vendor", "product" => "product", "version" => "2.0", "signature" => "signature", "name" => "name", "sev" => "1")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|vendor\|product\|2.0\|signature\|name\|1\|$/m)
+    end
+
+    it "should use default, if sev is not numeric" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.sev = "foo"
+      codec.fields = []
+      event = LogStash::Event.new("foo" => "bar")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|$/m)
+    end
+
+    it "should use default, if sev is > 10" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.sev = "11"
+      codec.fields = []
+      event = LogStash::Event.new("foo" => "bar")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|$/m)
+    end
+
+    it "should use default, if sev is < 0" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.sev = "0"
+      codec.fields = []
+      event = LogStash::Event.new("foo" => "bar")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|$/m)
+    end
+
+    it "should use integer, if sev is float" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.sev = "5.4"
+      codec.fields = []
+      event = LogStash::Event.new("foo" => "bar")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|5\|$/m)
+    end
+
+    it "should append fields as key/value pairs in cef extension part" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.fields = [ "foo", "bar" ]
+      event = LogStash::Event.new("foo" => "foo value", "bar" => "bar value")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=foo value bar=bar value$/m)
+    end
+
+    it "should ignore fields in fields if not present in event" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.fields = [ "foo", "bar", "baz" ]
+      event = LogStash::Event.new("foo" => "foo value", "baz" => "baz value")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=foo value baz=baz value$/m)
+    end
+
+    it "should sanitize header fields" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.vendor = "ven\ndor"
+      codec.product = "pro|duct"
+      codec.version = "ver\\sion"
+      codec.signature = "sig\r\nnature"
+      codec.name = "na\rme"
+      codec.sev = "4\n"
+      codec.fields = []
+      event = LogStash::Event.new("foo" => "bar")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|ven dor\|pro\\\|duct\|ver\\\\sion\|sig nature\|na me\|4\|$/m)
+    end
+
+    it "should sanitize extension keys" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.fields = [ "f o\no", "@b-a_r" ]
+      event = LogStash::Event.new("f o\no" => "foo value", "@b-a_r" => "bar value")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=foo value bar=bar value$/m)
+    end
+
+    it "should sanitize extension values" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.fields = [ "foo", "bar", "baz" ]
+      event = LogStash::Event.new("foo" => "foo\\value\n", "bar" => "bar=value\r")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=foo\\\\value\\n bar=bar\\=value\\n$/m)
+    end
+
+    it "should encode a hash value" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.fields = [ "foo" ]
+      event = LogStash::Event.new("foo" => { "bar" => "bar value", "baz" => "baz value" })
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=\{\"bar\":\"bar value\",\"baz\":\"baz value\"\}$/m)
+    end
+
+    it "should encode an array value" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.fields = [ "foo" ]
+      event = LogStash::Event.new("foo" => [ "bar", "baz" ])
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=\[\"bar\",\"baz\"\]$/m)
+    end
+
+    it "should encode a hash in an array value" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.fields = [ "foo" ]
+      event = LogStash::Event.new("foo" => [ { "bar" => "bar value" }, "baz" ])
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=\[\{\"bar\":\"bar value\"\},\"baz\"\]$/m)
+    end
+  end
+
+  context "sanitize header field" do
+    subject(:codec) { LogStash::Codecs::CEF.new }
+
+    it "should sanitize" do
+      expect(codec.sanitize_header_field("foo")).to be == "foo"
+      expect(codec.sanitize_header_field("foo\nbar")).to be == "foo bar"
+      expect(codec.sanitize_header_field("foo\rbar")).to be == "foo bar"
+      expect(codec.sanitize_header_field("foo\r\nbar")).to be == "foo bar"
+      expect(codec.sanitize_header_field("foo\r\nbar\r\nbaz")).to be == "foo bar baz"
+      expect(codec.sanitize_header_field("foo\\bar")).to be == "foo\\\\bar"
+      expect(codec.sanitize_header_field("foo|bar")).to be == "foo\\|bar"
+      expect(codec.sanitize_header_field("foo=bar")).to be == "foo=bar"
+    end
+  end
+
+  context "sanitize extension key" do
+    subject(:codec) { LogStash::Codecs::CEF.new }
+
+    it "should sanitize" do
+      expect(codec.sanitize_extension_key(" foo ")).to be == "foo"
+      expect(codec.sanitize_extension_key(" FOO 123 ")).to be == "FOO123"
+      expect(codec.sanitize_extension_key("foo\nbar\rbaz")).to be == "foobarbaz"
+      expect(codec.sanitize_extension_key("Foo_Bar\r\nBaz")).to be == "FooBarBaz"
+      expect(codec.sanitize_extension_key("foo-@bar=baz")).to be == "foobarbaz"
+      expect(codec.sanitize_extension_key("[foo]|bar.baz")).to be == "foobarbaz"
+    end
+  end
+
+  context "sanitize extension value" do
+    subject(:codec) { LogStash::Codecs::CEF.new }
+
+    it "should sanitize" do
+      expect(codec.sanitize_extension_val("foo")).to be == "foo"
+      expect(codec.sanitize_extension_val("foo\nbar")).to be == "foo\\nbar"
+      expect(codec.sanitize_extension_val("foo\rbar")).to be == "foo\\nbar"
+      expect(codec.sanitize_extension_val("foo\r\nbar")).to be == "foo\\nbar"
+      expect(codec.sanitize_extension_val("foo\r\nbar\r\nbaz")).to be == "foo\\nbar\\nbaz"
+      expect(codec.sanitize_extension_val("foo\\bar")).to be == "foo\\\\bar"
+      expect(codec.sanitize_extension_val("foo|bar")).to be == "foo|bar"
+      expect(codec.sanitize_extension_val("foo=bar")).to be == "foo\\=bar"
+    end
   end
 
   context "#decode" do
