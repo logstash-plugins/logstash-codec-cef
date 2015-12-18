@@ -14,6 +14,13 @@ describe LogStash::Codecs::CEF do
 
     let(:results)   { [] }
 
+    it "should not fail if fields is nil" do
+      codec.on_event{|data, newdata| results << newdata}
+      event = LogStash::Event.new("foo" => "bar")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|$/m)
+    end
+
     it "should assert all header fields are present" do
       codec.on_event{|data, newdata| results << newdata}
       codec.fields = []

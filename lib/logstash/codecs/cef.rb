@@ -112,9 +112,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
     # Should also probably set the fields sent
     header = ["CEF:0", vendor, product, version, signature, name, sev].join("|")
-    values = @fields.map {|fieldname| get_value(fieldname, event)}.compact.join(" ")
+    values = @fields.map {|fieldname| get_value(fieldname, event)}.compact.join(" ") unless fields.nil?
 
-    @on_event.call(event, header + "|" + values + "\n")
+    @on_event.call(event, header + "|" + values.to_s + "\n")
   end
 
   # Escape pipes and backslashes in the header. Equal signs are ok.
