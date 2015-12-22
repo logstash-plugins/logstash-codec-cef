@@ -187,7 +187,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   end
 
   def valid_sev?(sev)
-    return sev != "" && (sev.to_i.to_s == sev || sev.to_f.to_s == sev) && sev.to_i > 0 && sev.to_i < 10
+    return (sev.to_i.to_s == sev.to_s || sev.to_f.to_s == sev.to_s && sev.to_f - sev.to_i == 0) && sev.to_i >= 0 && sev.to_i <= 10
   end
 
 end

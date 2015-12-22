@@ -91,20 +91,20 @@ describe LogStash::Codecs::CEF do
 
     it "should use default, if sev is < 0" do
       codec.on_event{|data, newdata| results << newdata}
-      codec.sev = "0"
+      codec.sev = "-1"
       codec.fields = []
       event = LogStash::Event.new("foo" => "bar")
       codec.encode(event)
       expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|$/m)
     end
 
-    it "should use integer, if sev is float" do
+    it "should use default, if sev is float with decimal part" do
       codec.on_event{|data, newdata| results << newdata}
       codec.sev = "5.4"
       codec.fields = []
       event = LogStash::Event.new("foo" => "bar")
       codec.encode(event)
-      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|5\|$/m)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|$/m)
     end
 
     it "should append fields as key/value pairs in cef extension part" do
@@ -226,6 +226,24 @@ describe LogStash::Codecs::CEF do
       expect(codec.sanitize_extension_val("foo\\bar")).to be == "foo\\\\bar"
       expect(codec.sanitize_extension_val("foo|bar")).to be == "foo|bar"
       expect(codec.sanitize_extension_val("foo=bar")).to be == "foo\\=bar"
+    end
+  end
+
+  context "valid_sev?" do
+    subject(:codec) { LogStash::Codecs::CEF.new }
+
+    it "should validate sev" do
+      expect(codec.send(:valid_sev?, nil)).to be == false
+      expect(codec.send(:valid_sev?, "")).to be == false
+      expect(codec.send(:valid_sev?, "foo")).to be == false
+      expect(codec.send(:valid_sev?, "1.5")).to be == false
+      expect(codec.send(:valid_sev?, "-1")).to be == false
+      expect(codec.send(:valid_sev?, "11")).to be == false
+      expect(codec.send(:valid_sev?, "0")).to be == true
+      expect(codec.send(:valid_sev?, "10")).to be == true
+      expect(codec.send(:valid_sev?, "1.0")).to be == true
+      expect(codec.send(:valid_sev?, 1)).to be == true
+      expect(codec.send(:valid_sev?, 1.0)).to be == true
     end
   end
 
