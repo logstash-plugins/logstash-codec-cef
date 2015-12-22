@@ -176,6 +176,14 @@ describe LogStash::Codecs::CEF do
       codec.encode(event)
       expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=\[\{\"bar\":\"bar value\"\},\"baz\"\]$/m)
     end
+
+    it "should encode a LogStash::Timestamp" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.fields = [ "foo" ]
+      event = LogStash::Event.new("foo" => LogStash::Timestamp.new)
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=[0-9TZ.:-]+$/m)
+    end
   end
 
   context "sanitize header field" do

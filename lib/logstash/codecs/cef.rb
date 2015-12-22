@@ -179,6 +179,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       return sanitize_extension_key(fieldname) + "=" + sanitize_extension_val(val.to_json)
     when Hash
       return sanitize_extension_key(fieldname) + "=" + sanitize_extension_val(val.to_json)
+    when LogStash::Timestamp
+      return sanitize_extension_key(fieldname) + "=" + val.to_s
     else
       return sanitize_extension_key(fieldname) + "=" + sanitize_extension_val(val)
     end
