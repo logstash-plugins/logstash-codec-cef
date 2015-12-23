@@ -28,13 +28,23 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # to help you build a new value from other parts of the event.
   config :name, :validate => :string, :default => "Logstash"
 
+  # Deprecated severity field for CEF header. The new value can include `%{foo}` strings
+  # to help you build a new value from other parts of the event.
+  #
+  # This field is used only if :severity is unchanged set to the default value.
+  #
+  # Defined as field of type string to allow sprintf. The value will be validated
+  # to be an integer in the range from 0 to 10 (including).
+  # All invalid values will be mapped to the default of 6.
+  config :sev, :validate => :string, :default => "6", :deprecated => "This setting is being deprecated, use :severity instead."
+
   # Severity field in CEF header. The new value can include `%{foo}` strings
   # to help you build a new value from other parts of the event.
   #
   # Defined as field of type string to allow sprintf. The value will be validated
   # to be an integer in the range from 0 to 10 (including).
   # All invalid values will be mapped to the default of 6.
-  config :sev, :validate => :string, :default => "6"
+  config :severity, :validate => :string, :default => "6"
 
   # Fields to be included in CEV extension part as key/value pairs
   config :fields, :validate => :array
@@ -106,12 +116,15 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     name = sanitize_header_field(event.sprintf(@name))
     name = self.class.get_config["name"][:default] if name == ""
 
-    sev = sanitize_header_field(event.sprintf(@sev)).strip
-    sev = self.class.get_config["sev"][:default] unless valid_sev?(sev)
-    sev = sev.to_i.to_s
+    # :sev is deprecated and therefore only considered if :severity equals the default setting or is invalid
+    severity = sanitize_severity(event, @severity)
+    if severity == self.class.get_config["severity"][:default]
+      # Use deprecated setting sev
+      severity = sanitize_severity(event, @sev)
+    end
 
     # Should also probably set the fields sent
-    header = ["CEF:0", vendor, product, version, signature, name, sev].join("|")
+    header = ["CEF:0", vendor, product, version, signature, name, severity].join("|")
     values = @fields.map {|fieldname| get_value(fieldname, event)}.compact.join(" ") unless fields.nil?
 
     @on_event.call(event, header + "|" + values.to_s + "\n")
@@ -186,7 +199,13 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     end
   end
 
-  def valid_sev?(sev)
+  def sanitize_severity(event, severity)
+    severity = sanitize_header_field(event.sprintf(severity)).strip
+    severity = self.class.get_config["severity"][:default] unless valid_severity?(severity)
+    severity = severity.to_i.to_s
+  end
+
+  def valid_severity?(sev)
     return (sev.to_i.to_s == sev.to_s || sev.to_f.to_s == sev.to_s && sev.to_f - sev.to_i == 0) && sev.to_i >= 0 && sev.to_i <= 10
   end
 

@@ -36,7 +36,7 @@ describe LogStash::Codecs::CEF do
       codec.version = ""
       codec.signature = ""
       codec.name = ""
-      codec.sev = ""
+      codec.severity = ""
       codec.fields = []
       event = LogStash::Event.new("foo" => "bar")
       codec.encode(event)
@@ -50,7 +50,7 @@ describe LogStash::Codecs::CEF do
       codec.version = "2.0"
       codec.signature = "signature"
       codec.name = "name"
-      codec.sev = "1"
+      codec.severity = "1"
       codec.fields = []
       event = LogStash::Event.new("foo" => "bar")
       codec.encode(event)
@@ -64,43 +64,43 @@ describe LogStash::Codecs::CEF do
       codec.version = "%{version}"
       codec.signature = "%{signature}"
       codec.name = "%{name}"
-      codec.sev = "%{sev}"
+      codec.severity = "%{severity}"
       codec.fields = []
-      event = LogStash::Event.new("vendor" => "vendor", "product" => "product", "version" => "2.0", "signature" => "signature", "name" => "name", "sev" => "1")
+      event = LogStash::Event.new("vendor" => "vendor", "product" => "product", "version" => "2.0", "signature" => "signature", "name" => "name", "severity" => "1")
       codec.encode(event)
       expect(results.first).to match(/^CEF:0\|vendor\|product\|2.0\|signature\|name\|1\|$/m)
     end
 
-    it "should use default, if sev is not numeric" do
+    it "should use default, if severity is not numeric" do
       codec.on_event{|data, newdata| results << newdata}
-      codec.sev = "foo"
+      codec.severity = "foo"
       codec.fields = []
       event = LogStash::Event.new("foo" => "bar")
       codec.encode(event)
       expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|$/m)
     end
 
-    it "should use default, if sev is > 10" do
+    it "should use default, if severity is > 10" do
       codec.on_event{|data, newdata| results << newdata}
-      codec.sev = "11"
+      codec.severity = "11"
       codec.fields = []
       event = LogStash::Event.new("foo" => "bar")
       codec.encode(event)
       expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|$/m)
     end
 
-    it "should use default, if sev is < 0" do
+    it "should use default, if severity is < 0" do
       codec.on_event{|data, newdata| results << newdata}
-      codec.sev = "-1"
+      codec.severity = "-1"
       codec.fields = []
       event = LogStash::Event.new("foo" => "bar")
       codec.encode(event)
       expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|$/m)
     end
 
-    it "should use default, if sev is float with decimal part" do
+    it "should use default, if severity is float with decimal part" do
       codec.on_event{|data, newdata| results << newdata}
-      codec.sev = "5.4"
+      codec.severity = "5.4"
       codec.fields = []
       event = LogStash::Event.new("foo" => "bar")
       codec.encode(event)
@@ -130,7 +130,7 @@ describe LogStash::Codecs::CEF do
       codec.version = "ver\\sion"
       codec.signature = "sig\r\nnature"
       codec.name = "na\rme"
-      codec.sev = "4\n"
+      codec.severity = "4\n"
       codec.fields = []
       event = LogStash::Event.new("foo" => "bar")
       codec.encode(event)
@@ -184,6 +184,54 @@ describe LogStash::Codecs::CEF do
       codec.encode(event)
       expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=[0-9TZ.:-]+$/m)
     end
+
+    it "should use severity (instead of depricated sev), if severity is set)" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.sev = "4"
+      codec.severity = "5"
+      codec.fields = []
+      event = LogStash::Event.new("foo" => "bar")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|5\|$/m)
+    end
+
+    it "should use deprecated sev, if severity is not set (equals default value)" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.sev = "4"
+      codec.fields = []
+      event = LogStash::Event.new("foo" => "bar")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|4\|$/m)
+    end
+
+    it "should use deprecated sev, if severity is explicitly set to default value)" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.sev = "4"
+      codec.severity = "6"
+      codec.fields = []
+      event = LogStash::Event.new("foo" => "bar")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|4\|$/m)
+    end
+
+    it "should use deprecated sev, if severity is invalid" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.sev = "4"
+      codec.severity = ""
+      codec.fields = []
+      event = LogStash::Event.new("foo" => "bar")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|4\|$/m)
+    end
+
+    it "should use default value, if severity is not set and sev is invalid" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.sev = ""
+      codec.fields = []
+      event = LogStash::Event.new("foo" => "bar")
+      codec.encode(event)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|$/m)
+    end
   end
 
   context "sanitize header field" do
@@ -229,21 +277,21 @@ describe LogStash::Codecs::CEF do
     end
   end
 
-  context "valid_sev?" do
+  context "valid_severity?" do
     subject(:codec) { LogStash::Codecs::CEF.new }
 
-    it "should validate sev" do
-      expect(codec.send(:valid_sev?, nil)).to be == false
-      expect(codec.send(:valid_sev?, "")).to be == false
-      expect(codec.send(:valid_sev?, "foo")).to be == false
-      expect(codec.send(:valid_sev?, "1.5")).to be == false
-      expect(codec.send(:valid_sev?, "-1")).to be == false
-      expect(codec.send(:valid_sev?, "11")).to be == false
-      expect(codec.send(:valid_sev?, "0")).to be == true
-      expect(codec.send(:valid_sev?, "10")).to be == true
-      expect(codec.send(:valid_sev?, "1.0")).to be == true
-      expect(codec.send(:valid_sev?, 1)).to be == true
-      expect(codec.send(:valid_sev?, 1.0)).to be == true
+    it "should validate severity" do
+      expect(codec.send(:valid_severity?, nil)).to be == false
+      expect(codec.send(:valid_severity?, "")).to be == false
+      expect(codec.send(:valid_severity?, "foo")).to be == false
+      expect(codec.send(:valid_severity?, "1.5")).to be == false
+      expect(codec.send(:valid_severity?, "-1")).to be == false
+      expect(codec.send(:valid_severity?, "11")).to be == false
+      expect(codec.send(:valid_severity?, "0")).to be == true
+      expect(codec.send(:valid_severity?, "10")).to be == true
+      expect(codec.send(:valid_severity?, "1.0")).to be == true
+      expect(codec.send(:valid_severity?, 1)).to be == true
+      expect(codec.send(:valid_severity?, 1.0)).to be == true
     end
   end
 
