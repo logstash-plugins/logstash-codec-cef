@@ -130,6 +130,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     @on_event.call(event, header + "|" + values.to_s + "\n")
   end
 
+  private
+
   # Escape pipes and backslashes in the header. Equal signs are ok.
   # Newlines are forbidden.
   def sanitize_header_field(value)
@@ -179,8 +181,6 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
     return output
   end
-
-  private
 
   def get_value(fieldname, event)
     val = event[fieldname]

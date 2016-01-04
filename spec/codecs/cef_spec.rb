@@ -238,18 +238,18 @@ describe LogStash::Codecs::CEF do
     subject(:codec) { LogStash::Codecs::CEF.new }
 
     it "should sanitize" do
-      expect(codec.sanitize_header_field("foo")).to be == "foo"
-      expect(codec.sanitize_header_field("foo\nbar")).to be == "foo bar"
-      expect(codec.sanitize_header_field("foo\rbar")).to be == "foo bar"
-      expect(codec.sanitize_header_field("foo\r\nbar")).to be == "foo bar"
-      expect(codec.sanitize_header_field("foo\r\nbar\r\nbaz")).to be == "foo bar baz"
-      expect(codec.sanitize_header_field("foo\\bar")).to be == "foo\\\\bar"
-      expect(codec.sanitize_header_field("foo|bar")).to be == "foo\\|bar"
-      expect(codec.sanitize_header_field("foo=bar")).to be == "foo=bar"
-      expect(codec.sanitize_header_field(123)).to be == "123" # Input value is a Fixnum
-      expect(codec.sanitize_header_field(123.123)).to be == "123.123" # Input value is a Float
-      expect(codec.sanitize_header_field([])).to be == "[]" # Input value is an Array
-      expect(codec.sanitize_header_field({})).to be == "{}" # Input value is a Hash
+      expect(codec.send(:sanitize_header_field, "foo")).to be == "foo"
+      expect(codec.send(:sanitize_header_field, "foo\nbar")).to be == "foo bar"
+      expect(codec.send(:sanitize_header_field, "foo\rbar")).to be == "foo bar"
+      expect(codec.send(:sanitize_header_field, "foo\r\nbar")).to be == "foo bar"
+      expect(codec.send(:sanitize_header_field, "foo\r\nbar\r\nbaz")).to be == "foo bar baz"
+      expect(codec.send(:sanitize_header_field, "foo\\bar")).to be == "foo\\\\bar"
+      expect(codec.send(:sanitize_header_field, "foo|bar")).to be == "foo\\|bar"
+      expect(codec.send(:sanitize_header_field, "foo=bar")).to be == "foo=bar"
+      expect(codec.send(:sanitize_header_field, 123)).to be == "123" # Input value is a Fixnum
+      expect(codec.send(:sanitize_header_field, 123.123)).to be == "123.123" # Input value is a Float
+      expect(codec.send(:sanitize_header_field, [])).to be == "[]" # Input value is an Array
+      expect(codec.send(:sanitize_header_field, {})).to be == "{}" # Input value is a Hash
     end
   end
 
@@ -257,16 +257,16 @@ describe LogStash::Codecs::CEF do
     subject(:codec) { LogStash::Codecs::CEF.new }
 
     it "should sanitize" do
-      expect(codec.sanitize_extension_key(" foo ")).to be == "foo"
-      expect(codec.sanitize_extension_key(" FOO 123 ")).to be == "FOO123"
-      expect(codec.sanitize_extension_key("foo\nbar\rbaz")).to be == "foobarbaz"
-      expect(codec.sanitize_extension_key("Foo_Bar\r\nBaz")).to be == "FooBarBaz"
-      expect(codec.sanitize_extension_key("foo-@bar=baz")).to be == "foobarbaz"
-      expect(codec.sanitize_extension_key("[foo]|bar.baz")).to be == "foobarbaz"
-      expect(codec.sanitize_extension_key(123)).to be == "123" # Input value is a Fixnum
-      expect(codec.sanitize_extension_key(123.123)).to be == "123123" # Input value is a Float, "." is not allowed and therefore removed
-      expect(codec.sanitize_extension_key([])).to be == "" # Input value is an Array, "[" and "]" are not allowed and therefore removed
-      expect(codec.sanitize_extension_key({})).to be == "" # Input value is a Hash, "{" and "}" are not allowed and therefore removed
+      expect(codec.send(:sanitize_extension_key, " foo ")).to be == "foo"
+      expect(codec.send(:sanitize_extension_key, " FOO 123 ")).to be == "FOO123"
+      expect(codec.send(:sanitize_extension_key, "foo\nbar\rbaz")).to be == "foobarbaz"
+      expect(codec.send(:sanitize_extension_key, "Foo_Bar\r\nBaz")).to be == "FooBarBaz"
+      expect(codec.send(:sanitize_extension_key, "foo-@bar=baz")).to be == "foobarbaz"
+      expect(codec.send(:sanitize_extension_key, "[foo]|bar.baz")).to be == "foobarbaz"
+      expect(codec.send(:sanitize_extension_key, 123)).to be == "123" # Input value is a Fixnum
+      expect(codec.send(:sanitize_extension_key, 123.123)).to be == "123123" # Input value is a Float, "." is not allowed and therefore removed
+      expect(codec.send(:sanitize_extension_key, [])).to be == "" # Input value is an Array, "[" and "]" are not allowed and therefore removed
+      expect(codec.send(:sanitize_extension_key, {})).to be == "" # Input value is a Hash, "{" and "}" are not allowed and therefore removed
     end
   end
 
@@ -274,18 +274,18 @@ describe LogStash::Codecs::CEF do
     subject(:codec) { LogStash::Codecs::CEF.new }
 
     it "should sanitize" do
-      expect(codec.sanitize_extension_val("foo")).to be == "foo"
-      expect(codec.sanitize_extension_val("foo\nbar")).to be == "foo\\nbar"
-      expect(codec.sanitize_extension_val("foo\rbar")).to be == "foo\\nbar"
-      expect(codec.sanitize_extension_val("foo\r\nbar")).to be == "foo\\nbar"
-      expect(codec.sanitize_extension_val("foo\r\nbar\r\nbaz")).to be == "foo\\nbar\\nbaz"
-      expect(codec.sanitize_extension_val("foo\\bar")).to be == "foo\\\\bar"
-      expect(codec.sanitize_extension_val("foo|bar")).to be == "foo|bar"
-      expect(codec.sanitize_extension_val("foo=bar")).to be == "foo\\=bar"
-      expect(codec.sanitize_extension_val(123)).to be == "123" # Input value is a Fixnum
-      expect(codec.sanitize_extension_val(123.123)).to be == "123.123" # Input value is a Float
-      expect(codec.sanitize_extension_val([])).to be == "[]" # Input value is an Array
-      expect(codec.sanitize_extension_val({})).to be == "{}" # Input value is a Hash
+      expect(codec.send(:sanitize_extension_val, "foo")).to be == "foo"
+      expect(codec.send(:sanitize_extension_val, "foo\nbar")).to be == "foo\\nbar"
+      expect(codec.send(:sanitize_extension_val, "foo\rbar")).to be == "foo\\nbar"
+      expect(codec.send(:sanitize_extension_val, "foo\r\nbar")).to be == "foo\\nbar"
+      expect(codec.send(:sanitize_extension_val, "foo\r\nbar\r\nbaz")).to be == "foo\\nbar\\nbaz"
+      expect(codec.send(:sanitize_extension_val, "foo\\bar")).to be == "foo\\\\bar"
+      expect(codec.send(:sanitize_extension_val, "foo|bar")).to be == "foo|bar"
+      expect(codec.send(:sanitize_extension_val, "foo=bar")).to be == "foo\\=bar"
+      expect(codec.send(:sanitize_extension_val, 123)).to be == "123" # Input value is a Fixnum
+      expect(codec.send(:sanitize_extension_val, 123.123)).to be == "123.123" # Input value is a Float
+      expect(codec.send(:sanitize_extension_val, [])).to be == "[]" # Input value is an Array
+      expect(codec.send(:sanitize_extension_val, {})).to be == "{}" # Input value is a Hash
     end
   end
 
