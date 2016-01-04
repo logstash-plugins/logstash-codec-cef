@@ -47,7 +47,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   config :severity, :validate => :string, :default => "6"
 
   # Fields to be included in CEV extension part as key/value pairs
-  config :fields, :validate => :array
+  config :fields, :validate => :array, :default => []
 
   public
   def initialize(params={})
@@ -125,7 +125,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
     # Should also probably set the fields sent
     header = ["CEF:0", vendor, product, version, signature, name, severity].join("|")
-    values = @fields.map {|fieldname| get_value(fieldname, event)}.compact.join(" ") unless fields.nil?
+    values = @fields.map {|fieldname| get_value(fieldname, event)}.compact.join(" ")
 
     @on_event.call(event, header + "|" + values.to_s + "\n")
   end
