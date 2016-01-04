@@ -188,9 +188,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     return nil if val.nil?
 
     case val
-    when Array
-      return "#{sanitize_extension_key(fieldname)}=#{sanitize_extension_val(val.to_json)}"
-    when Hash
+    when Array, Hash
       return "#{sanitize_extension_key(fieldname)}=#{sanitize_extension_val(val.to_json)}"
     when LogStash::Timestamp
       return "#{sanitize_extension_key(fieldname)}=#{val.to_s}"
@@ -210,8 +208,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     # check if it's an integer or a float with no remainder
     # and if the value is between 0 and 10 (inclusive)
     (f % 1 == 0) && f.between?(0,10)
-    rescue TypeError, ArgumentError
-      false
+  rescue TypeError, ArgumentError
+    false
   end
 
 end
