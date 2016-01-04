@@ -206,7 +206,12 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   end
 
   def valid_severity?(sev)
-    return (sev.to_i.to_s == sev.to_s || sev.to_f.to_s == sev.to_s && sev.to_f - sev.to_i == 0) && sev.to_i >= 0 && sev.to_i <= 10
+    f = Float(sev)
+    # check if it's an integer or a float with no remainder
+    # and if the value is between 0 and 10 (inclusive)
+    (f % 1 == 0) && f.between?(0,10)
+    rescue TypeError, ArgumentError
+      false
   end
 
 end
