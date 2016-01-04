@@ -246,6 +246,10 @@ describe LogStash::Codecs::CEF do
       expect(codec.sanitize_header_field("foo\\bar")).to be == "foo\\\\bar"
       expect(codec.sanitize_header_field("foo|bar")).to be == "foo\\|bar"
       expect(codec.sanitize_header_field("foo=bar")).to be == "foo=bar"
+      expect(codec.sanitize_header_field(123)).to be == "123" # Input value is a Fixnum
+      expect(codec.sanitize_header_field(123.123)).to be == "123.123" # Input value is a Float
+      expect(codec.sanitize_header_field([])).to be == "[]" # Input value is an Array
+      expect(codec.sanitize_header_field({})).to be == "{}" # Input value is a Hash
     end
   end
 
@@ -259,6 +263,10 @@ describe LogStash::Codecs::CEF do
       expect(codec.sanitize_extension_key("Foo_Bar\r\nBaz")).to be == "FooBarBaz"
       expect(codec.sanitize_extension_key("foo-@bar=baz")).to be == "foobarbaz"
       expect(codec.sanitize_extension_key("[foo]|bar.baz")).to be == "foobarbaz"
+      expect(codec.sanitize_extension_key(123)).to be == "123" # Input value is a Fixnum
+      expect(codec.sanitize_extension_key(123.123)).to be == "123123" # Input value is a Float, "." is not allowed and therefore removed
+      expect(codec.sanitize_extension_key([])).to be == "" # Input value is an Array, "[" and "]" are not allowed and therefore removed
+      expect(codec.sanitize_extension_key({})).to be == "" # Input value is a Hash, "{" and "}" are not allowed and therefore removed
     end
   end
 
@@ -274,6 +282,10 @@ describe LogStash::Codecs::CEF do
       expect(codec.sanitize_extension_val("foo\\bar")).to be == "foo\\\\bar"
       expect(codec.sanitize_extension_val("foo|bar")).to be == "foo|bar"
       expect(codec.sanitize_extension_val("foo=bar")).to be == "foo\\=bar"
+      expect(codec.sanitize_extension_val(123)).to be == "123" # Input value is a Fixnum
+      expect(codec.sanitize_extension_val(123.123)).to be == "123.123" # Input value is a Float
+      expect(codec.sanitize_extension_val([])).to be == "[]" # Input value is an Array
+      expect(codec.sanitize_extension_val({})).to be == "{}" # Input value is a Hash
     end
   end
 

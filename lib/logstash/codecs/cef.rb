@@ -135,7 +135,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   def sanitize_header_field(value)
     output = ""
 
-    value = value.gsub(/\r\n/, "\n")
+    value = value.to_s.gsub(/\r\n/, "\n")
 
     value.each_char{|c|
       case c
@@ -154,7 +154,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Keys must be made up of a single word, with no spaces
   # must be alphanumeric
   def sanitize_extension_key(value)
-    value = value.gsub(/[^a-zA-Z0-9]/, "")
+    value = value.to_s.gsub(/[^a-zA-Z0-9]/, "")
     return value
   end
 
@@ -164,7 +164,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   def sanitize_extension_val(value)
     output = ""
 
-    value = value.gsub(/\r\n/, "\n")
+    value = value.to_s.gsub(/\r\n/, "\n")
 
     value.each_char{|c|
       case c
