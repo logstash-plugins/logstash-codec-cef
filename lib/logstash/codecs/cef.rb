@@ -127,7 +127,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     header = ["CEF:0", vendor, product, version, signature, name, severity].join("|")
     values = @fields.map {|fieldname| get_value(fieldname, event)}.compact.join(" ")
 
-    @on_event.call(event, header + "|" + values.to_s + "\n")
+    @on_event.call(event, "#{header}|#{values}\n")
   end
 
   private
@@ -189,13 +189,13 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
     case val
     when Array
-      return sanitize_extension_key(fieldname) + "=" + sanitize_extension_val(val.to_json)
+      return "#{sanitize_extension_key(fieldname)}=#{sanitize_extension_val(val.to_json)}"
     when Hash
-      return sanitize_extension_key(fieldname) + "=" + sanitize_extension_val(val.to_json)
+      return "#{sanitize_extension_key(fieldname)}=#{sanitize_extension_val(val.to_json)}"
     when LogStash::Timestamp
-      return sanitize_extension_key(fieldname) + "=" + val.to_s
+      return "#{sanitize_extension_key(fieldname)}=#{val.to_s}"
     else
-      return sanitize_extension_key(fieldname) + "=" + sanitize_extension_val(val)
+      return "#{sanitize_extension_key(fieldname)}=#{sanitize_extension_val(val)}"
     end
   end
 
