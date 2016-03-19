@@ -369,6 +369,14 @@ describe LogStash::Codecs::CEF do
       end 
     end
 
+    let (:pipes_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this|has an pipe'}
+    it "should be OK with not escaped pipes in the message" do
+      subject.decode(pipes_in_message) do |e|
+        ext = e['cef_ext']
+        insist { ext['moo'] } == 'this|has an pipe'
+      end
+    end
+
     let (:syslog) { "Syslogdate Sysloghost CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
     it "Should detect headers before CEF starts" do
       subject.decode(syslog) do |e|

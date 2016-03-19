@@ -62,8 +62,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     end
     event = LogStash::Event.new
 
-    # Split by the pipes
-    event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], message = data.split /(?<!\\)[\|]/
+    # Split by the pipes, pipes in the extension part are perfectly valid and do not need escaping
+    event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], *message = data.split /(?<!\\)[\|]/
+    message = message.join('|')
 
     # Try and parse out the syslog header if there is one
     if event['cef_version'].include? ' '
