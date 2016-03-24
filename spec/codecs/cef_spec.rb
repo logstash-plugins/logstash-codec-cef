@@ -158,7 +158,7 @@ describe LogStash::Codecs::CEF do
       codec.fields = [ "foo" ]
       event = LogStash::Event.new("foo" => { "bar" => "bar value", "baz" => "baz value" })
       codec.encode(event)
-      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=\{\"bar\":\"bar value\",\"baz\":\"baz value\"\}$/m)
+      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=\{\"ba[rz]\":\"ba[rz] value\",\"ba[rz]\":\"ba[rz] value\"\}$/m)
     end
 
     it "should encode an array value" do
