@@ -1,3 +1,5 @@
+# 2.1.3
+  - Switch in-place sub! to sub when extracting `cef_version`. new Logstash Java Event does not support in-place String changes.
 # 2.1.2
   - Depend on logstash-core-plugin-api instead of logstash-core, removing the need to mass update plugins on major releases of logstash
 # 2.1.1
