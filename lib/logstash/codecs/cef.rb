@@ -71,7 +71,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     end
 
     # Get rid of the CEF bit in the version
-    event['cef_version'].sub! /^CEF:/, ''
+    version = event['cef_version'].sub /^CEF:/, ''
+    event['cef_version'] = version
 
     # Strip any whitespace from the message
     if not message.nil? and message.include? '='
