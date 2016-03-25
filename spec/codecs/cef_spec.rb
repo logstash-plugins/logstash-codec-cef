@@ -3,6 +3,7 @@
 require "logstash/devutils/rspec/spec_helper"
 require "logstash/codecs/cef"
 require "logstash/event"
+require "json"
 
 describe LogStash::Codecs::CEF do
   subject do
@@ -158,7 +159,10 @@ describe LogStash::Codecs::CEF do
       codec.fields = [ "foo" ]
       event = LogStash::Event.new("foo" => { "bar" => "bar value", "baz" => "baz value" })
       codec.encode(event)
-      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=\{\"ba[rz]\":\"ba[rz] value\",\"ba[rz]\":\"ba[rz] value\"\}$/m)
+      foo = results.first[/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=(.*)$/, 1]
+      expect(foo).not_to be_nil
+      foo_hash = JSON.parse(foo)
+      expect(foo_hash).to eq({"bar" => "bar value", "baz" => "baz value"})
     end
 
     it "should encode an array value" do
@@ -166,7 +170,10 @@ describe LogStash::Codecs::CEF do
       codec.fields = [ "foo" ]
       event = LogStash::Event.new("foo" => [ "bar", "baz" ])
       codec.encode(event)
-      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=\[\"bar\",\"baz\"\]$/m)
+      foo = results.first[/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=(.*)$/, 1]
+      expect(foo).not_to be_nil
+      foo_array = JSON.parse(foo)
+      expect(foo_array).to eq(["bar", "baz"])
     end
 
     it "should encode a hash in an array value" do
@@ -174,7 +181,10 @@ describe LogStash::Codecs::CEF do
       codec.fields = [ "foo" ]
       event = LogStash::Event.new("foo" => [ { "bar" => "bar value" }, "baz" ])
       codec.encode(event)
-      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=\[\{\"bar\":\"bar value\"\},\"baz\"\]$/m)
+      foo = results.first[/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=(.*)$/, 1]
+      expect(foo).not_to be_nil
+      foo_array = JSON.parse(foo)
+      expect(foo_array).to eq([{"bar" => "bar value"}, "baz"])
     end
 
     it "should encode a LogStash::Timestamp" do
