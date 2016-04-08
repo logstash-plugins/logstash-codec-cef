@@ -1,7 +1,6 @@
 # Logstash Plugin
 
-[![Build
-Status](http://build-eu-00.elastic.co/view/LS%20Plugins/view/LS%20Codecs/job/logstash-plugin-codec-cef-unit/badge/icon)](http://build-eu-00.elastic.co/view/LS%20Plugins/view/LS%20Codecs/job/logstash-plugin-codec-cef-unit/)
+[![Travis Build Status](https://travis-ci.org/logstash-plugins/logstash-codec-cef.svg)](https://travis-ci.org/logstash-plugins/logstash-codec-cef)
 
 This is a plugin for [Logstash](https://github.com/elastic/logstash).
 
