@@ -395,6 +395,14 @@ describe LogStash::Codecs::CEF do
       end
     end
 
+    let (:equal_in_header) {'CEF:0|security|threatmanager=equal|1.0|100|trojan successfully stopped|10|'}
+    it "should be OK with equal in the headers" do
+      subject.decode(equal_in_header) do |e|
+        validate(e)
+        insist { e["cef_product"] } == "threatmanager=equal"
+      end
+    end
+
     let (:syslog) { "Syslogdate Sysloghost CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
     it "Should detect headers before CEF starts" do
       subject.decode(syslog) do |e|
