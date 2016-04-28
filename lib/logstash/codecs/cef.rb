@@ -63,8 +63,21 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     event = LogStash::Event.new
 
     # Split by the pipes, pipes in the extension part are perfectly valid and do not need escaping
-    event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], *message = data.split /(?<!\\)[\|]/
+    # The better solution for the splitting regex would be /(?<!\\(\\\\)*)[\|]/, but this
+    # gives an "SyntaxError: (RegexpError) invalid pattern in look-behind" for the variable length look behind.
+    # Therefore one edge case is not handled properly: \\| (this should split, but it does not, because the escaped \ is not recognized)
+    # TODO: To solve all unescaping cases, regex is not suitable. A little parse should be written.
+    event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], *message = data.split /(?<=[^\\]\\\\)[\|]|(?<!\\)[\|]/
     message = message.join('|')
+
+    # Unescape pipes and backslash in header fields
+    event['cef_version'] = event['cef_version'].gsub(/\\\|/, '|').gsub(/\\\\/, '\\')
+    event['cef_vendor'] = event['cef_vendor'].gsub(/\\\|/, '|').gsub(/\\\\/, '\\')
+    event['cef_product'] = event['cef_product'].gsub(/\\\|/, '|').gsub(/\\\\/, '\\')
+    event['cef_device_version'] = event['cef_device_version'].gsub(/\\\|/, '|').gsub(/\\\\/, '\\')
+    event['cef_sigid'] = event['cef_sigid'].gsub(/\\\|/, '|').gsub(/\\\\/, '\\')
+    event['cef_name'] = event['cef_name'].gsub(/\\\|/, '|').gsub(/\\\\/, '\\')
+    event['cef_severity'] = event['cef_severity'].gsub(/\\\|/, '|').gsub(/\\\\/, '\\') unless event['cef_severity'].nil?
 
     # Try and parse out the syslog header if there is one
     if event['cef_version'].include? ' '
@@ -72,8 +85,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     end
 
     # Get rid of the CEF bit in the version
-    version = event['cef_version'].sub /^CEF:/, ''
-    event['cef_version'] = version
+    event['cef_version'] = event['cef_version'].sub /^CEF:/, ''
 
     # Strip any whitespace from the message
     if not message.nil? and message.include? '='

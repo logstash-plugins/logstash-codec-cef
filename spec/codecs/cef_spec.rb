@@ -395,6 +395,49 @@ describe LogStash::Codecs::CEF do
       end
     end
 
+    let (:escaped_backslash_in_header) {'CEF:0|secu\\\\rity|threat\\\\manager|1.\\\\0|10\\\\0|tro\\\\jan successfully stopped|\\\\10|'}
+    it "should be OK with escaped backslash in the headers" do
+      subject.decode(escaped_backslash_in_header) do |e|
+        insist { e["cef_version"] } == '0'
+        insist { e["cef_vendor"] } == 'secu\\rity'
+        insist { e["cef_product"] } == 'threat\\manager'
+        insist { e["cef_device_version"] } == '1.\\0'
+        insist { e["cef_sigid"] } == '10\\0'
+        insist { e["cef_name"] } == 'tro\\jan successfully stopped'
+        insist { e["cef_severity"] } == '\\10'
+      end
+    end
+
+    let (:escaped_backslash_in_header_edge_case) {'CEF:0|security\\\\\\||threatmanager\\\\|1.0|100|trojan successfully stopped|10|'}
+    it "should be OK with escaped backslash in the headers (edge case: escaped slash in front of pipe)" do
+      subject.decode(escaped_backslash_in_header_edge_case) do |e|
+        validate(e)
+        insist { e["cef_vendor"] } == 'security\\|'
+        insist { e["cef_product"] } == 'threatmanager\\'
+      end
+    end
+
+    let (:escaped_pipes_in_header) {'CEF:0|secu\\|rity|threatmanager\\||1.\\|0|10\\|0|tro\\|jan successfully stopped|\\|10|'}
+    it "should be OK with escaped pipes in the headers" do
+      subject.decode(escaped_pipes_in_header) do |e|
+        insist { e["cef_version"] } == '0'
+        insist { e["cef_vendor"] } == 'secu|rity'
+        insist { e["cef_product"] } == 'threatmanager|'
+        insist { e["cef_device_version"] } == '1.|0'
+        insist { e["cef_sigid"] } == '10|0'
+        insist { e["cef_name"] } == 'tro|jan successfully stopped'
+        insist { e["cef_severity"] } == '|10'
+      end
+    end
+
+    let (:escaped_backslash_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this \\\\has escaped \\\\ backslashs\\\\'}
+    it "should be OK with escaped backslashs in the message" do
+      subject.decode(escaped_backslash_in_message) do |e|
+        ext = e['cef_ext']
+        insist { ext['moo'] } == 'this \\has escaped \\ backslashs\\'
+      end
+    end
+
     let (:equal_in_header) {'CEF:0|security|threatmanager=equal|1.0|100|trojan successfully stopped|10|'}
     it "should be OK with equal in the headers" do
       subject.decode(equal_in_header) do |e|
