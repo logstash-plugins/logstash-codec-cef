@@ -80,15 +80,15 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       message = message.strip
 
       # If the last KVP has no value, add an empty string, this prevents hash errors below
-      if message.end_with?("=")
-        message=message + ' '
+      if message.end_with?('=')
+        message=message + ' ' unless message.end_with?('\=')
       end
 
       # Now parse the key value pairs into it
       extensions = {}
       message = message.split(/ ([\w\.]+)=/)
       key, value = message.shift.split('=', 2)
-      extensions[key] = value
+      extensions[key] = value.gsub(/\\=/, '=').gsub(/\\\\/, '\\')
 
       Hash[*message].each{ |k, v| extensions[k] = v }
 
