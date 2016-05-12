@@ -2,10 +2,10 @@
 require "logstash/codecs/base"
 require "json"
 
+# Implementation of a Logstash codec for the ArcSight Common Event Format (CEF)
+# Based on Revision 20 of Implementing ArcSight CEF, dated from June 05, 2013
+# https://protect724.hp.com/servlet/JiveServlet/downloadBody/1072-102-6-4697/CommonEventFormat.pdf
 class LogStash::Codecs::CEF < LogStash::Codecs::Base
-  # Implementation of a Logstash codec for the ArcSight Common Event Format (CEF)
-  # Based on Revision 20 of Implementing ArcSight CEF, dated from June 05, 2013
-  # https://protect724.hp.com/servlet/JiveServlet/downloadBody/1072-102-6-4697/CommonEventFormat.pdf
   config_name "cef"
 
   # Device vendor field in CEF header. The new value can include `%{foo}` strings
