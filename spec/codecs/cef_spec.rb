@@ -394,7 +394,35 @@ describe LogStash::Codecs::CEF do
         insist { e['syslog'] } == 'Syslogdate Sysloghost'
       end 
     end
+  end
 
+  context "encode and decode" do
+    subject(:codec) { LogStash::Codecs::CEF.new }
+
+    let(:results)   { [] }
+
+    it "should return an equal event if encoded and decoded again" do
+      codec.on_event{|data, newdata| results << newdata}
+      codec.vendor = "%{cef_vendor}"
+      codec.product = "%{cef_product}"
+      codec.version = "%{cef_device_version}"
+      codec.signature = "%{cef_sigid}"
+      codec.name = "%{cef_name}"
+      codec.severity = "%{cef_severity}"
+      codec.fields = [ "foo" ]
+      event = LogStash::Event.new("cef_vendor" => "vendor", "cef_product" => "product", "cef_device_version" => "2.0", "cef_sigid" => "signature", "cef_name" => "name", "cef_severity" => "1", "foo" => "bar")
+      codec.encode(event)
+      codec.decode(results.first) do |e|
+        expect(e['cef_vendor']).to be == event['cef_vendor']
+        expect(e['cef_product']).to be == event['cef_product']
+        expect(e['cef_device_version']).to be == event['cef_device_version']
+        expect(e['cef_sigid']).to be == event['cef_sigid']
+        expect(e['cef_name']).to be == event['cef_name']
+        expect(e['cef_severity']).to be == event['cef_severity']
+        # decode saves extensions as hash to 'cef_ext'
+        expect(e['cef_ext']['foo']).to be == event['foo']
+      end
+    end
   end
 
 end
