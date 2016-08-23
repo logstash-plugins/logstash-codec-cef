@@ -49,9 +49,17 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Fields to be included in CEV extension part as key/value pairs
   config :fields, :validate => :array, :default => []
 
+  HEADER_FIELDS = ['cef_version','cef_vendor','cef_product','cef_device_version','cef_sigid','cef_name','cef_severity']
+  
   public
   def initialize(params={})
     super(params)
+  end
+
+  private
+  def store_header_field(event,field_name,field_data)
+    #Unescape pipes and backslash in header fields
+    event.set(field_name,field_data.gsub(/\\\|/, '|').gsub(/\\\\/, '\\')) unless field_data.nil?
   end
 
   public
@@ -67,25 +75,24 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     # gives an "SyntaxError: (RegexpError) invalid pattern in look-behind" for the variable length look behind.
     # Therefore one edge case is not handled properly: \\| (this should split, but it does not, because the escaped \ is not recognized)
     # TODO: To solve all unescaping cases, regex is not suitable. A little parse should be written.
-    event['cef_version'], event['cef_vendor'], event['cef_product'], event['cef_device_version'], event['cef_sigid'], event['cef_name'], event['cef_severity'], *message = data.split /(?<=[^\\]\\\\)[\|]|(?<!\\)[\|]/
-    message = message.join('|')
+    split_data = data.split /(?<=[^\\]\\\\)[\|]|(?<!\\)[\|]/
 
-    # Unescape pipes and backslash in header fields
-    event['cef_version'] = event['cef_version'].gsub(/\\\|/, '|').gsub(/\\\\/, '\\')
-    event['cef_vendor'] = event['cef_vendor'].gsub(/\\\|/, '|').gsub(/\\\\/, '\\')
-    event['cef_product'] = event['cef_product'].gsub(/\\\|/, '|').gsub(/\\\\/, '\\')
-    event['cef_device_version'] = event['cef_device_version'].gsub(/\\\|/, '|').gsub(/\\\\/, '\\')
-    event['cef_sigid'] = event['cef_sigid'].gsub(/\\\|/, '|').gsub(/\\\\/, '\\')
-    event['cef_name'] = event['cef_name'].gsub(/\\\|/, '|').gsub(/\\\\/, '\\')
-    event['cef_severity'] = event['cef_severity'].gsub(/\\\|/, '|').gsub(/\\\\/, '\\') unless event['cef_severity'].nil?
+    # Store header fields
+    HEADER_FIELDS.each_with_index do |field_name, index|
+      store_header_field(event,field_name,split_data[index])
+    end
+    #Remainder is message
+    message = split_data[HEADER_FIELDS.size..-1].join('|')
 
     # Try and parse out the syslog header if there is one
-    if event['cef_version'].include? ' '
-      event['syslog'], unused, event['cef_version'] = event['cef_version'].rpartition(' ')
+    if event.get('cef_version').include? ' '
+      split_cef_version= event.get('cef_version').rpartition(' ')
+      event.set('syslog', split_cef_version[0])
+      event.set('cef_version',split_cef_version[2])
     end
 
     # Get rid of the CEF bit in the version
-    event['cef_version'] = event['cef_version'].sub /^CEF:/, ''
+    event.set('cef_version', event.get('cef_version').sub(/^CEF:/, ''))
 
     # Strip any whitespace from the message
     if not message.nil? and message.include? '='
@@ -101,11 +108,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       message = message.split(/ ([\w\.]+)=/)
       key, value = message.shift.split('=', 2)
       extensions[key] = value.gsub(/\\=/, '=').gsub(/\\\\/, '\\')
-
       Hash[*message].each{ |k, v| extensions[k] = v }
-
       # And save the new has as the extensions
-      event['cef_ext'] = extensions
+      event.set('cef_ext', extensions)
     end
 
     yield event
@@ -197,7 +202,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   end
 
   def get_value(fieldname, event)
-    val = event[fieldname]
+    val = event.get(fieldname)
 
     return nil if val.nil?
 
