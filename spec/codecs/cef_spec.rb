@@ -322,25 +322,25 @@ describe LogStash::Codecs::CEF do
 
     def validate(e) 
       insist { e.is_a?(LogStash::Event) }
-      insist { e['cef_version'] } == "0"
-      insist { e['cef_device_version'] } == "1.0"
-      insist { e['cef_sigid'] } == "100"
-      insist { e['cef_name'] } == "trojan successfully stopped"
-      insist { e['cef_severity'] } == "10"
+      insist { e.get('cef_version') } == "0"
+      insist { e.get('cef_device_version') } == "1.0"
+      insist { e.get('cef_sigid') } == "100"
+      insist { e.get('cef_name') } == "trojan successfully stopped"
+      insist { e.get('cef_severity') } == "10"
     end
 
     it "should parse the cef headers" do
       subject.decode(message) do |e|
         validate(e)
-        ext = e['cef_ext']
-        insist { e["cef_vendor"] } == "security"
-        insist { e["cef_product"] } == "threatmanager"
+        ext = e.get('cef_ext')
+        insist { e.get("cef_vendor") } == "security"
+        insist { e.get("cef_product") } == "threatmanager"
       end
     end
 
     it "should parse the cef body" do
       subject.decode(message) do |e|
-        ext = e['cef_ext']
+        ext = e.get('cef_ext')
         insist { ext['src'] } == "10.0.0.192"
         insist { ext['dst'] } == "12.121.122.82"
         insist { ext['spt'] } == "1232"
@@ -351,7 +351,7 @@ describe LogStash::Codecs::CEF do
     it "should be OK with no extension dictionary" do
       subject.decode(no_ext) do |e|
         validate(e)
-        insist { e["cef_ext"] } == nil
+        insist { e.get("cef_ext") } == nil
       end 
     end
 
@@ -359,8 +359,8 @@ describe LogStash::Codecs::CEF do
     it "should be OK with missing CEF headers (multiple pipes in sequence)" do
       subject.decode(missing_headers) do |e|
         validate(e)
-        insist { e["cef_vendor"] } == ""
-        insist { e["cef_product"] } == ""
+        insist { e.get("cef_vendor") } == ""
+        insist { e.get("cef_product") } == ""
       end 
     end
 
@@ -374,7 +374,7 @@ describe LogStash::Codecs::CEF do
     let (:escaped_pipes) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this\|has an escaped pipe' }
     it "should be OK with escaped pipes in the message" do
       subject.decode(escaped_pipes) do |e|
-        ext = e['cef_ext']
+        ext = e.get('cef_ext')
         insist { ext['moo'] } == 'this\|has an escaped pipe'
       end 
     end
@@ -382,7 +382,7 @@ describe LogStash::Codecs::CEF do
     let (:pipes_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this|has an pipe'}
     it "should be OK with not escaped pipes in the message" do
       subject.decode(pipes_in_message) do |e|
-        ext = e['cef_ext']
+        ext = e.get('cef_ext')
         insist { ext['moo'] } == 'this|has an pipe'
       end
     end
@@ -390,7 +390,7 @@ describe LogStash::Codecs::CEF do
     let (:escaped_equal_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this \=has escaped \= equals\='}
     it "should be OK with escaped equal in the message" do
       subject.decode(escaped_equal_in_message) do |e|
-        ext = e['cef_ext']
+        ext = e.get('cef_ext')
         insist { ext['moo'] } == 'this =has escaped = equals='
       end
     end
@@ -398,13 +398,13 @@ describe LogStash::Codecs::CEF do
     let (:escaped_backslash_in_header) {'CEF:0|secu\\\\rity|threat\\\\manager|1.\\\\0|10\\\\0|tro\\\\jan successfully stopped|\\\\10|'}
     it "should be OK with escaped backslash in the headers" do
       subject.decode(escaped_backslash_in_header) do |e|
-        insist { e["cef_version"] } == '0'
-        insist { e["cef_vendor"] } == 'secu\\rity'
-        insist { e["cef_product"] } == 'threat\\manager'
-        insist { e["cef_device_version"] } == '1.\\0'
-        insist { e["cef_sigid"] } == '10\\0'
-        insist { e["cef_name"] } == 'tro\\jan successfully stopped'
-        insist { e["cef_severity"] } == '\\10'
+        insist { e.get("cef_version") } == '0'
+        insist { e.get("cef_vendor") } == 'secu\\rity'
+        insist { e.get("cef_product") } == 'threat\\manager'
+        insist { e.get("cef_device_version") } == '1.\\0'
+        insist { e.get("cef_sigid") } == '10\\0'
+        insist { e.get("cef_name") } == 'tro\\jan successfully stopped'
+        insist { e.get("cef_severity") } == '\\10'
       end
     end
 
@@ -412,28 +412,28 @@ describe LogStash::Codecs::CEF do
     it "should be OK with escaped backslash in the headers (edge case: escaped slash in front of pipe)" do
       subject.decode(escaped_backslash_in_header_edge_case) do |e|
         validate(e)
-        insist { e["cef_vendor"] } == 'security\\|'
-        insist { e["cef_product"] } == 'threatmanager\\'
+        insist { e.get("cef_vendor") } == 'security\\|'
+        insist { e.get("cef_product") } == 'threatmanager\\'
       end
     end
 
     let (:escaped_pipes_in_header) {'CEF:0|secu\\|rity|threatmanager\\||1.\\|0|10\\|0|tro\\|jan successfully stopped|\\|10|'}
     it "should be OK with escaped pipes in the headers" do
       subject.decode(escaped_pipes_in_header) do |e|
-        insist { e["cef_version"] } == '0'
-        insist { e["cef_vendor"] } == 'secu|rity'
-        insist { e["cef_product"] } == 'threatmanager|'
-        insist { e["cef_device_version"] } == '1.|0'
-        insist { e["cef_sigid"] } == '10|0'
-        insist { e["cef_name"] } == 'tro|jan successfully stopped'
-        insist { e["cef_severity"] } == '|10'
+        insist { e.get("cef_version") } == '0'
+        insist { e.get("cef_vendor") } == 'secu|rity'
+        insist { e.get("cef_product") } == 'threatmanager|'
+        insist { e.get("cef_device_version") } == '1.|0'
+        insist { e.get("cef_sigid") } == '10|0'
+        insist { e.get("cef_name") } == 'tro|jan successfully stopped'
+        insist { e.get("cef_severity") } == '|10'
       end
     end
 
     let (:escaped_backslash_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this \\\\has escaped \\\\ backslashs\\\\'}
     it "should be OK with escaped backslashs in the message" do
       subject.decode(escaped_backslash_in_message) do |e|
-        ext = e['cef_ext']
+        ext = e.get('cef_ext')
         insist { ext['moo'] } == 'this \\has escaped \\ backslashs\\'
       end
     end
@@ -442,7 +442,7 @@ describe LogStash::Codecs::CEF do
     it "should be OK with equal in the headers" do
       subject.decode(equal_in_header) do |e|
         validate(e)
-        insist { e["cef_product"] } == "threatmanager=equal"
+        insist { e.get("cef_product") } == "threatmanager=equal"
       end
     end
 
@@ -450,7 +450,7 @@ describe LogStash::Codecs::CEF do
     it "Should detect headers before CEF starts" do
       subject.decode(syslog) do |e|
         validate(e)
-        insist { e['syslog'] } == 'Syslogdate Sysloghost'
+        insist { e.get('syslog') } == 'Syslogdate Sysloghost'
       end 
     end
   end
@@ -472,14 +472,14 @@ describe LogStash::Codecs::CEF do
       event = LogStash::Event.new("cef_vendor" => "vendor", "cef_product" => "product", "cef_device_version" => "2.0", "cef_sigid" => "signature", "cef_name" => "name", "cef_severity" => "1", "foo" => "bar")
       codec.encode(event)
       codec.decode(results.first) do |e|
-        expect(e['cef_vendor']).to be == event['cef_vendor']
-        expect(e['cef_product']).to be == event['cef_product']
-        expect(e['cef_device_version']).to be == event['cef_device_version']
-        expect(e['cef_sigid']).to be == event['cef_sigid']
-        expect(e['cef_name']).to be == event['cef_name']
-        expect(e['cef_severity']).to be == event['cef_severity']
+        expect(e.get('cef_vendor')).to be == event.get('cef_vendor')
+        expect(e.get('cef_product')).to be == event.get('cef_product')
+        expect(e.get('cef_device_version')).to be == event.get('cef_device_version')
+        expect(e.get('cef_sigid')).to be == event.get('cef_sigid')
+        expect(e.get('cef_name')).to be == event.get('cef_name')
+        expect(e.get('cef_severity')).to be == event.get('cef_severity')
         # decode saves extensions as hash to 'cef_ext'
-        expect(e['cef_ext']['foo']).to be == event['foo']
+        expect(e.get('[cef_ext][foo]')).to be == event.get('foo')
       end
     end
   end
