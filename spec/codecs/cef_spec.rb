@@ -451,7 +451,16 @@ describe LogStash::Codecs::CEF do
       subject.decode(syslog) do |e|
         validate(e)
         insist { e.get('syslog') } == 'Syslogdate Sysloghost'
-      end 
+      end
+    end
+
+    context "when payload is not in CEF" do
+      let (:message) { "potatoes" }
+      it "Should detect headers before CEF starts" do
+        subject.decode(message) do |e|
+          insist { e.get('tags') } == ['_cefparsefailure']
+        end
+      end
     end
   end
 

@@ -5,6 +5,9 @@ require "json"
 # Implementation of a Logstash codec for the ArcSight Common Event Format (CEF)
 # Based on Revision 20 of Implementing ArcSight CEF, dated from June 05, 2013
 # https://protect724.hp.com/servlet/JiveServlet/downloadBody/1072-102-6-4697/CommonEventFormat.pdf
+#
+# If this codec receives a payload from an input that is not a valid CEF message, then it will
+# produce an event with the payload as the 'message' field and a '_cefparsefailure' tag.
 class LogStash::Codecs::CEF < LogStash::Codecs::Base
   config_name "cef"
 
@@ -114,6 +117,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     end
 
     yield event
+  rescue => e
+    @logger.error("Failed to decode event payload. Generating failure event with payload in message field.", :error => e.message, :backtrace => e.backtrace, :data => data)
+    yield LogStash::Event.new("message" => data, "tags" => ["_cefparsefailure"])
   end
 
   public

@@ -1,3 +1,6 @@
+## 3.1.0
+ - add _cefparsefailure tag on failed decode
+
 ## 3.0.0
  - breaking: Updated plugin to use new Java Event APIs
 
