@@ -1,5 +1,4 @@
 # encoding: utf-8
-
 require "logstash/devutils/rspec/spec_helper"
 require "logstash/codecs/cef"
 require "logstash/event"
@@ -339,7 +338,7 @@ describe LogStash::Codecs::CEF do
 
     it "should parse the cef body" do
       subject.decode(message) do |e|
-        insist { e.get("sourceAddress") } == "10.0.0.192"
+        insist { e.get("sourceAddress")} == "10.0.0.192"
         insist { e.get("destinationAddress") } == "12.121.122.82"
         insist { e.get("sourcePort") } == "1232"
       end
@@ -375,10 +374,10 @@ describe LogStash::Codecs::CEF do
       end
     end
 
-    let (:escaped_equal_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this \=has escaped \= equals\='}
-    it "should be OK with escaped equal in the message" do
-      subject.decode(escaped_equal_in_message) do |e|
-        insist { e.get("moo") } == 'this \=has escaped \= equals\='
+    let (:equal_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this =has = equals\='}
+    it "should be OK with equal in the message" do
+      subject.decode(equal_in_message) do |e|
+        insist { e.get("moo") } == 'this =has = equals\='
       end
     end
 
@@ -417,10 +416,10 @@ describe LogStash::Codecs::CEF do
       end
     end
 
-    let (:escaped_backslash_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this \\\\has escaped \\\\ backslashs\\\\'}
-    it "should be OK with escaped backslashs in the message" do
-      subject.decode(escaped_backslash_in_message) do |e|
-        insist { e.get("moo") } == 'this \\\\has escaped \\\\ backslashs\\\\'
+    let (:backslash_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this \\has \\ backslashs\\'}
+    it "should be OK with backslashs in the message" do
+      subject.decode(backslash_in_message) do |e|
+        insist { e.get("moo") } == 'this \\has \\ backslashs\\'
       end
     end
 
@@ -429,6 +428,62 @@ describe LogStash::Codecs::CEF do
       subject.decode(equal_in_header) do |e|
         validate(e)
         insist { e.get("deviceProduct") } == "threatmanager=equal"
+      end
+    end
+
+    let (:spaces_in_between_keys) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10| src=10.0.0.192  dst=12.121.122.82  spt=1232'}
+    it "should be OK to have one or more spaces between keys" do
+      subject.decode(spaces_in_between_keys) do |e|
+        validate(e)
+        insist { e.get("sourceAddress") } == "10.0.0.192"
+        insist { e.get("destinationAddress") } == "12.121.122.82"
+        insist { e.get("sourcePort") } == "1232"
+      end
+    end
+
+    let (:allow_spaces_in_values) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82  spt=1232 dproc=InternetExplorer x.x.x.x'}
+    it "should be OK to have one or more spaces in values" do
+      subject.decode(allow_spaces_in_values) do |e|
+        validate(e)
+        insist { e.get("sourceAddress") } == "10.0.0.192"
+        insist { e.get("destinationAddress") } == "12.121.122.82"
+        insist { e.get("sourcePort") } == "1232"
+        insist { e.get("destinationProcessName") } == "InternetExplorer x.x.x.x"
+      end
+    end
+
+    let (:trim_additional_fields_with_dot_notations) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 ad.field[0]=field0 ad.name[1]=new_name'}
+    it "should remove ad.fields" do
+      subject.decode(trim_additional_fields_with_dot_notations) do |e|
+        validate(e)
+        insist { e.get("sourceAddress") } == "10.0.0.192"
+        insist { e.get("destinationAddress") } == "12.121.122.82"
+        insist { e.get("ad.field[0]") } == nil
+        insist { e.get("ad.name[1]") } == nil
+      end
+    end
+
+    let (:preserve_unmatched_key_mappings) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 new_key_by_device=new_values here'}
+    it "should remove ad.fields" do
+      subject.decode(preserve_unmatched_key_mappings) do |e|
+        validate(e)
+        insist { e.get("sourceAddress") } == "10.0.0.192"
+        insist { e.get("destinationAddress") } == "12.121.122.82"
+        insist { e.get("new_key_by_device") } == "new_values here"
+      end
+    end
+
+    let (:translate_abbreviated_cef_fields) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 proto=TCP shost=source.host.name dhost=destination.host.name spt=11024 dpt=9200'}
+    it "should translate most known abbreviated CEF field names" do
+      subject.decode(translate_abbreviated_cef_fields) do |e|
+        validate(e)
+        insist { e.get("sourceAddress") } == "10.0.0.192"
+        insist { e.get("destinationAddress") } == "12.121.122.82"
+        insist { e.get("transportProtocol") } == "TCP"
+        insist { e.get("sourceHostName") } == "source.host.name"
+        insist { e.get("destinationHostName") } == "destination.host.name"
+        insist { e.get("sourcePort") } == "11024"
+        insist { e.get("destinationPort") } == "9200"
       end
     end
 
@@ -464,7 +519,7 @@ describe LogStash::Codecs::CEF do
         expect(e.get('deviceEventClassId')).to be == event.get('deviceEventClassId')
         expect(e.get('name')).to be == event.get('name')
         expect(e.get('severity')).to be == event.get('severity')
-        expect(e.get('[foo]')).to be == event.get('foo')
+        expect(e.get('foo')).to be == event.get('foo')
       end
     end
   end
