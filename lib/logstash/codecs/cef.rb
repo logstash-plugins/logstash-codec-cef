@@ -49,10 +49,15 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Fields to be included in CEV extension part as key/value pairs
   config :fields, :validate => :array, :default => []
 
+  # Add description here
+  config :deprecated_v1_fields, :validate => :boolean, :default => false, :deprecated => "This setting is being deprecated"
+
   HEADER_FIELDS = ['cefVersion','deviceVendor','deviceProduct','deviceVersion','deviceEventClassId','name','severity']
 
   # Translating and flattening the CEF extensions with known field names as documented in the Common Event Format whitepaper
   MAPPINGS = { "act" => "deviceAction", "app" => "applicationProtocol", "c6a1" => "deviceCustomIPv6Address1", "c6a1Label" => "deviceCustomIPv6Address1Label", "c6a2" => "deviceCustomIPv6Address2", "c6a2Label" => "deviceCustomIPv6Address2Label", "c6a3" => "deviceCustomIPv6Address3", "c6a3Label" => "deviceCustomIPv6Address3Label", "c6a4" => "deviceCustomIPv6Address4", "c6a4Label" => "deviceCustomIPv6Address4Label", "cat" => "deviceEventCategory", "cfp1" => "deviceCustomFloatingPoint1", "cfp1Label" => "deviceCustomFloatingPoint1Label", "cfp2" => "deviceCustomFloatingPoint2", "cfp2Label" => "deviceCustomFloatingPoint2", "cfp3" => "deviceCustomFloatingPoint3", "cfp3Label" => "deviceCustomFloatingPoint4Label", "cfp4" => "deviceCustomFloatingPoint4", "cfp4Label" => "deviceCustomFloatingPoint4Label", "cn1" => "deviceCustomNumber1", "cn1Label" => "deviceCustomNumber1Label", "cn2" => "deviceCustomNumber2", "cn2Label" => "deviceCustomNumber2Label", "cn3" => "deviceCustomNumber3", "cn3Label" => "deviceCustomNumber3Label", "cnt" => "baseEventCount", "cs1" => "deviceCustomString1", "cs1Label" => "deviceCustomString1Label", "cs2" => "deviceCustomString2", "cs2Label" => "deviceCustomString2Label", "cs3" => "deviceCustomString3", "cs3Label" => "deviceCustomString3Label", "cs4" => "deviceCustomString4", "cs4Label" => "deviceCustomString4Label", "cs5" => "deviceCustomString5", "cs5Label" => "deviceCustomString5Label", "cs6" => "deviceCustomString6", "cs6Label" => "deviceCustomString6Label", "dhost" => "destinationHostName", "dmac" => "destinationMacAddress", "dntdom" => "destinationNTDomain", "dpid" => "destinationProcessId", "dpriv" => "destinationUserPrivileges", "dproc" => "destinationProcessName", "dpt" => "destinationPort", "dst" => "destinationAddress", "duid" => "destinationUserId", "duser" => "destinationUserName", "dvc" => "deviceAddress", "dvchost" => "deviceHostName", "dvcpid" => "deviceProcessId", "end" => "endTime", "fname" => "fileName", "fsize" => "fileSize", "in" => "bytesIn", "msg" => "message", "out" => "bytesOut", "proto" => "transportProtocol", "request" => "requestUrl", "rt" => "receiptTime", "shost" => "sourceHostName", "smac" => "sourceMacAddress", "sntdom" => "sourceNtDomain", "spid" => "sourceProcessId", "spriv" => "sourceUserPrivileges", "sproc" => "sourceProcessName", "spt" => "sourcePort", "src" => "sourceAddress", "start" => "startTime", "suid" => "sourceUserId", "suser" => "sourceUserName", "ahost" => "agentHost", "art" => "agentReceiptTime", "at" => "agentType", "aid" => "agentId", "_cefVer" => "cefVersion", "agt" => "agentAddress", "av" => "agentVersion", "atz" => "agentTimeZone", "dtz" => "destinationTimeZone", "slong" => "sourceLongitude", "slat" => "sourceLatitude", "dlong" => "destinationLongitude", "dlat" => "destinationLatitude", "catdt" => "categoryDeviceType", "mrt" => "managerReceiptTime" }
+
+  DEPRECATED_HEADER_FIELDS = ['cef_version','cef_vendor','cef_product','cef_device_version','cef_sigid','cef_name','cef_severity']
 
   public
   def initialize(params={})
@@ -80,52 +85,96 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     # TODO: To solve all unescaping cases, regex is not suitable. A little parse should be written.
     split_data = data.split /(?<=[^\\]\\\\)[\|]|(?<!\\)[\|]/
 
-    # Store header fields
-    HEADER_FIELDS.each_with_index do |field_name, index|
-      store_header_field(event,field_name,split_data[index])
+    # To be invoked when config settings is set to TRUE for V1 field names (cef_ext.<fieldname>) the following code might be removed in upcoming Codec revisions
+    deprecated_v1_fields = true
+    if deprecated_v1_fields #= true
+      # Store header fields
+      DEPRECATED_HEADER_FIELDS.each_with_index do |field_name, index|
+        store_header_field(event,field_name,split_data[index])
+      end
+      #Remainder is message
+      message = split_data[DEPRECATED_HEADER_FIELDS.size..-1].join('|')
+
+      # Try and parse out the syslog header if there is one
+      if event.get('cef_version').include? ' '
+        split_cef_version= event.get('cef_version').rpartition(' ')
+        event.set('syslog', split_cef_version[0])
+        event.set('cef_version',split_cef_version[2])
+      end
+
+      # Get rid of the CEF bit in the version
+      event.set('cef_version', event.get('cef_version').sub(/^CEF:/, ''))
+
+      # Strip any whitespace from the message
+      if not message.nil? and message.include? '='
+        message = message.strip
+
+        # If the last KVP has no value, add an empty string, this prevents hash errors below
+        if message.end_with?('=')
+          message=message + ' ' unless message.end_with?('\=')
+        end
+
+        # Now parse the key value pairs into it
+        extensions = {}
+        message = message.split(/ ([\w\.]+)=/)
+        key, value = message.shift.split('=', 2)
+        extensions[key] = value.gsub(/\\=/, '=').gsub(/\\\\/, '\\')
+        Hash[*message].each{ |k, v| extensions[k] = v }
+        # And save the new has as the extensions
+        event.set('cef_ext', extensions)
+      end
     end
-    #Remainder is message
-    message = split_data[HEADER_FIELDS.size..-1].join('|')
 
-    # Try and parse out the syslog header if there is one
-    if event.get('cefVersion').include? ' '
-      split_cef_version= event.get('cefVersion').rpartition(' ')
-      event.set('syslog', split_cef_version[0])
-      event.set('cefVersion',split_cef_version[2])
-    end
+    # To be invoked with default config settings to utilise the new field name formatting and flatten out the JSON document
+    #if deprecated_v1_fields == false
+      # Store header fields
+      HEADER_FIELDS.each_with_index do |field_name, index|
+        store_header_field(event,field_name,split_data[index])
+      end
+      #Remainder is message
+      message = split_data[HEADER_FIELDS.size..-1].join('|')
 
-    # Get rid of the CEF bit in the version
-    event.set('cefVersion', event.get('cefVersion').sub(/^CEF:/, ''))
-
-    # Strip any whitespace from the message
-    if not message.nil? and message.include? '='
-      message = message.strip
-
-      # If the last KVP has no value, add an empty string, this prevents hash errors below
-      if message.end_with?('=')
-        message=message + ' ' unless message.end_with?('\=')
+      # Try and parse out the syslog header if there is one
+      if event.get('cefVersion').include? ' '
+        split_cef_version= event.get('cefVersion').rpartition(' ')
+        event.set('syslog', split_cef_version[0])
+        event.set('cefVersion',split_cef_version[2])
       end
 
-      # Insert custom delimiter to separate key-value pairs, to which some values will contain special characters
-      # This separator '|^^^' os tested to be unique
-      message=message.gsub((/\s+(\w+=)/),'|^^^\1')
+      # Get rid of the CEF bit in the version
+      event.set('cefVersion', event.get('cefVersion').sub(/^CEF:/, ''))
 
-      # This portion strips out the additional fields from the CEF logs, if needed, the ArcSight connectors will need to map it accordingly
-      # Also implemented to safeguard the {dot} notations in ES versions below 2.4x
-      message=message.gsub((/ (ad\.\w+.*\]\=[^|^^^]+)/),'')
-      message=message.split('|^^^')
+      # Strip any whitespace from the message
+      if not message.nil? and message.include? '='
+        message = message.strip
 
-      # Replaces the '=' with '***' to avoid conflict with strings with HTML content namely key-value pairs where the values contain HTML strings
-      # Example : requestUrl = http://<testdomain>:<port>?query=A
-      for i in 0..message.length-1
-        message[i]=message[i].sub(/\=/, "***")
-      end
+        # If the last KVP has no value, add an empty string, this prevents hash errors below
+        if message.end_with?('=')
+          message = message + ' ' unless message.end_with?('\=')
+        end
 
-      message=message.map {|s| k, v = s.split('***'); "#{MAPPINGS[k] || k }=#{v}"}
-      message=message.each_with_object({}) do |k|
-        key, value = k.split(/\s*=\s*/,2)
-        event.set(key, value)
-      end
+        # Insert custom delimiter to separate key-value pairs, to which some values will contain special characters
+        # This separator '|^^^' os tested to be unique
+        message = message.gsub((/\s+(\w+=)/),'|^^^\1')
+
+        # This portion strips out the additional fields from the CEF logs, if needed, the ArcSight connectors will need to map it accordingly
+        # Also implemented to safeguard the {dot} notations in ES versions below 2.4x
+        message = message.gsub((/ (ad\.\w+.*\]\=[^|^^^]+)/),'')
+        message = message.split('|^^^')
+
+        # Replaces the '=' with '***' to avoid conflict with strings with HTML content namely key-value pairs where the values contain HTML strings
+        # Example : requestUrl = http://<testdomain>:<port>?query=A
+        for i in 0..message.length-1
+          message[i] = message[i].sub(/\=/, "***")
+          message[i] = message[i].gsub(/\\=/, '=').gsub(/\\\\/, '\\')
+        end
+
+        message = message.map {|s| k, v = s.split('***'); "#{MAPPINGS[k] || k }=#{v}"}
+        message = message.each_with_object({}) do |k|
+          key, value = k.split(/\s*=\s*/,2)
+          event.set(key, value)
+        end
+      #end
     end
 
     yield event
