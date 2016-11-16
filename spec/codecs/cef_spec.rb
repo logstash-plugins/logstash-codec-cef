@@ -1,5 +1,4 @@
 # encoding: utf-8
-
 require "logstash/devutils/rspec/spec_helper"
 require "logstash/codecs/cef"
 require "logstash/event"
@@ -320,6 +319,193 @@ describe LogStash::Codecs::CEF do
   context "#decode" do
     let (:message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
 
+    def validate(e)
+      insist { e.is_a?(LogStash::Event) }
+      insist { e.get('cefVersion') } == "0"
+      insist { e.get('deviceVersion') } == "1.0"
+      insist { e.get('deviceEventClassId') } == "100"
+      insist { e.get('name') } == "trojan successfully stopped"
+      insist { e.get('severity') } == "10"
+    end
+
+    it "should parse the cef headers" do
+      subject.decode(message) do |e|
+        validate(e)
+        insist { e.get("deviceVendor") } == "security"
+        insist { e.get("deviceProduct") } == "threatmanager"
+      end
+    end
+
+    it "should parse the cef body" do
+      subject.decode(message) do |e|
+        insist { e.get("sourceAddress")} == "10.0.0.192"
+        insist { e.get("destinationAddress") } == "12.121.122.82"
+        insist { e.get("sourcePort") } == "1232"
+      end
+    end
+
+    let (:missing_headers) { "CEF:0|||1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+    it "should be OK with missing CEF headers (multiple pipes in sequence)" do
+      subject.decode(missing_headers) do |e|
+        validate(e)
+        insist { e.get("deviceVendor") } == ""
+        insist { e.get("deviceProduct") } == ""
+      end
+    end
+
+    let (:leading_whitespace) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10| src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+    it "should strip leading whitespace from the message" do
+      subject.decode(leading_whitespace) do |e|
+        validate(e)
+      end
+    end
+
+    let (:escaped_pipes) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this\|has an escaped pipe' }
+    it "should be OK with escaped pipes in the message" do
+      subject.decode(escaped_pipes) do |e|
+        insist { e.get("moo") } == 'this\|has an escaped pipe'
+      end
+    end
+
+    let (:pipes_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this|has an pipe'}
+    it "should be OK with not escaped pipes in the message" do
+      subject.decode(pipes_in_message) do |e|
+        insist { e.get("moo") } == 'this|has an pipe'
+      end
+    end
+
+    let (:equal_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this =has = equals\='}
+    it "should be OK with equal in the message" do
+      subject.decode(equal_in_message) do |e|
+        insist { e.get("moo") } == 'this =has = equals='
+      end
+    end
+
+    let (:escaped_backslash_in_header) {'CEF:0|secu\\\\rity|threat\\\\manager|1.\\\\0|10\\\\0|tro\\\\jan successfully stopped|\\\\10|'}
+    it "should be OK with escaped backslash in the headers" do
+      subject.decode(escaped_backslash_in_header) do |e|
+        insist { e.get("cefVersion") } == '0'
+        insist { e.get("deviceVendor") } == 'secu\\rity'
+        insist { e.get("deviceProduct") } == 'threat\\manager'
+        insist { e.get("deviceVersion") } == '1.\\0'
+        insist { e.get("deviceEventClassId") } == '10\\0'
+        insist { e.get("name") } == 'tro\\jan successfully stopped'
+        insist { e.get("severity") } == '\\10'
+      end
+    end
+
+    let (:escaped_backslash_in_header_edge_case) {'CEF:0|security\\\\\\||threatmanager\\\\|1.0|100|trojan successfully stopped|10|'}
+    it "should be OK with escaped backslash in the headers (edge case: escaped slash in front of pipe)" do
+      subject.decode(escaped_backslash_in_header_edge_case) do |e|
+        validate(e)
+        insist { e.get("deviceVendor") } == 'security\\|'
+        insist { e.get("deviceProduct") } == 'threatmanager\\'
+      end
+    end
+
+    let (:escaped_pipes_in_header) {'CEF:0|secu\\|rity|threatmanager\\||1.\\|0|10\\|0|tro\\|jan successfully stopped|\\|10|'}
+    it "should be OK with escaped pipes in the headers" do
+      subject.decode(escaped_pipes_in_header) do |e|
+        insist { e.get("cefVersion") } == '0'
+        insist { e.get("deviceVendor") } == 'secu|rity'
+        insist { e.get("deviceProduct") } == 'threatmanager|'
+        insist { e.get("deviceVersion") } == '1.|0'
+        insist { e.get("deviceEventClassId") } == '10|0'
+        insist { e.get("name") } == 'tro|jan successfully stopped'
+        insist { e.get("severity") } == '|10'
+      end
+    end
+
+    let (:backslash_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this \\has \\ backslashs\\'}
+    it "should be OK with backslashs in the message" do
+      subject.decode(backslash_in_message) do |e|
+        insist { e.get("moo") } == 'this \\has \\ backslashs\\'
+      end
+    end
+
+    let (:equal_in_header) {'CEF:0|security|threatmanager=equal|1.0|100|trojan successfully stopped|10|'}
+    it "should be OK with equal in the headers" do
+      subject.decode(equal_in_header) do |e|
+        validate(e)
+        insist { e.get("deviceProduct") } == "threatmanager=equal"
+      end
+    end
+
+    let (:spaces_in_between_keys) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10| src=10.0.0.192  dst=12.121.122.82  spt=1232'}
+    it "should be OK to have one or more spaces between keys" do
+      subject.decode(spaces_in_between_keys) do |e|
+        validate(e)
+        insist { e.get("sourceAddress") } == "10.0.0.192"
+        insist { e.get("destinationAddress") } == "12.121.122.82"
+        insist { e.get("sourcePort") } == "1232"
+      end
+    end
+
+    let (:allow_spaces_in_values) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82  spt=1232 dproc=InternetExplorer x.x.x.x'}
+    it "should be OK to have one or more spaces in values" do
+      subject.decode(allow_spaces_in_values) do |e|
+        validate(e)
+        insist { e.get("sourceAddress") } == "10.0.0.192"
+        insist { e.get("destinationAddress") } == "12.121.122.82"
+        insist { e.get("sourcePort") } == "1232"
+        insist { e.get("destinationProcessName") } == "InternetExplorer x.x.x.x"
+      end
+    end
+
+    let (:trim_additional_fields_with_dot_notations) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 ad.field[0]=field0 ad.name[1]=new_name'}
+    it "should remove ad.fields" do
+      subject.decode(trim_additional_fields_with_dot_notations) do |e|
+        validate(e)
+        insist { e.get("sourceAddress") } == "10.0.0.192"
+        insist { e.get("destinationAddress") } == "12.121.122.82"
+        insist { e.get("ad.field[0]") } == nil
+        insist { e.get("ad.name[1]") } == nil
+      end
+    end
+
+    let (:preserve_unmatched_key_mappings) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 new_key_by_device=new_values here'}
+    it "should remove ad.fields" do
+      subject.decode(preserve_unmatched_key_mappings) do |e|
+        validate(e)
+        insist { e.get("sourceAddress") } == "10.0.0.192"
+        insist { e.get("destinationAddress") } == "12.121.122.82"
+        insist { e.get("new_key_by_device") } == "new_values here"
+      end
+    end
+
+    let (:translate_abbreviated_cef_fields) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 proto=TCP shost=source.host.name dhost=destination.host.name spt=11024 dpt=9200'}
+    it "should translate most known abbreviated CEF field names" do
+      subject.decode(translate_abbreviated_cef_fields) do |e|
+        validate(e)
+        insist { e.get("sourceAddress") } == "10.0.0.192"
+        insist { e.get("destinationAddress") } == "12.121.122.82"
+        insist { e.get("transportProtocol") } == "TCP"
+        insist { e.get("sourceHostName") } == "source.host.name"
+        insist { e.get("destinationHostName") } == "destination.host.name"
+        insist { e.get("sourcePort") } == "11024"
+        insist { e.get("destinationPort") } == "9200"
+      end
+    end
+
+    let (:syslog) { "Syslogdate Sysloghost CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+    it "Should detect headers before CEF starts" do
+      subject.decode(syslog) do |e|
+        validate(e)
+        insist { e.get('syslog') } == 'Syslogdate Sysloghost'
+      end
+    end
+  end
+  
+  context "decode with deprecated version option" do
+    let (:message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+    let(:options) {
+      {
+        "deprecated_v1_fields" => true
+      }
+    }
+    
+    subject(:codec) { LogStash::Codecs::CEF.new(options) }
+    
     def validate(e) 
       insist { e.is_a?(LogStash::Event) }
       insist { e.get('cef_version') } == "0"
@@ -327,6 +513,11 @@ describe LogStash::Codecs::CEF do
       insist { e.get('cef_sigid') } == "100"
       insist { e.get('cef_name') } == "trojan successfully stopped"
       insist { e.get('cef_severity') } == "10"
+      insist { e.get('cefVersion') } == "0"
+      insist { e.get('deviceVersion') } == "1.0"
+      insist { e.get('deviceEventClassId') } == "100"
+      insist { e.get('name') } == "trojan successfully stopped"
+      insist { e.get('severity') } == "10"
     end
 
     it "should parse the cef headers" do
@@ -335,6 +526,8 @@ describe LogStash::Codecs::CEF do
         ext = e.get('cef_ext')
         insist { e.get("cef_vendor") } == "security"
         insist { e.get("cef_product") } == "threatmanager"
+        insist { e.get("deviceVendor") } == "security"
+        insist { e.get("deviceProduct") } == "threatmanager"
       end
     end
 
@@ -344,6 +537,9 @@ describe LogStash::Codecs::CEF do
         insist { ext['src'] } == "10.0.0.192"
         insist { ext['dst'] } == "12.121.122.82"
         insist { ext['spt'] } == "1232"
+        insist { e.get("sourceAddress")} == "10.0.0.192"
+        insist { e.get("destinationAddress") } == "12.121.122.82"
+        insist { e.get("sourcePort") } == "1232"
       end
     end
 
@@ -361,6 +557,8 @@ describe LogStash::Codecs::CEF do
         validate(e)
         insist { e.get("cef_vendor") } == ""
         insist { e.get("cef_product") } == ""
+        insist { e.get("deviceVendor") } == ""
+        insist { e.get("deviceProduct") } == ""
       end 
     end
 
@@ -427,6 +625,13 @@ describe LogStash::Codecs::CEF do
         insist { e.get("cef_sigid") } == '10|0'
         insist { e.get("cef_name") } == 'tro|jan successfully stopped'
         insist { e.get("cef_severity") } == '|10'
+        insist { e.get("cefVersion") } == '0'
+        insist { e.get("deviceVendor") } == 'secu|rity'
+        insist { e.get("deviceProduct") } == 'threatmanager|'
+        insist { e.get("deviceVersion") } == '1.|0'
+        insist { e.get("deviceEventClassId") } == '10|0'
+        insist { e.get("name") } == 'tro|jan successfully stopped'
+        insist { e.get("severity") } == '|10'
       end
     end
 
@@ -462,24 +667,23 @@ describe LogStash::Codecs::CEF do
 
     it "should return an equal event if encoded and decoded again" do
       codec.on_event{|data, newdata| results << newdata}
-      codec.vendor = "%{cef_vendor}"
-      codec.product = "%{cef_product}"
-      codec.version = "%{cef_device_version}"
-      codec.signature = "%{cef_sigid}"
-      codec.name = "%{cef_name}"
-      codec.severity = "%{cef_severity}"
+      codec.vendor = "%{deviceVendor}"
+      codec.product = "%{deviceProduct}"
+      codec.version = "%{deviceVersion}"
+      codec.signature = "%{deviceEventClassId}"
+      codec.name = "%{name}"
+      codec.severity = "%{severity}"
       codec.fields = [ "foo" ]
-      event = LogStash::Event.new("cef_vendor" => "vendor", "cef_product" => "product", "cef_device_version" => "2.0", "cef_sigid" => "signature", "cef_name" => "name", "cef_severity" => "1", "foo" => "bar")
+      event = LogStash::Event.new("deviceVendor" => "vendor", "deviceProduct" => "product", "deviceVersion" => "2.0", "deviceEventClassId" => "signature", "name" => "name", "severity" => "1", "foo" => "bar")
       codec.encode(event)
       codec.decode(results.first) do |e|
-        expect(e.get('cef_vendor')).to be == event.get('cef_vendor')
-        expect(e.get('cef_product')).to be == event.get('cef_product')
-        expect(e.get('cef_device_version')).to be == event.get('cef_device_version')
-        expect(e.get('cef_sigid')).to be == event.get('cef_sigid')
-        expect(e.get('cef_name')).to be == event.get('cef_name')
-        expect(e.get('cef_severity')).to be == event.get('cef_severity')
-        # decode saves extensions as hash to 'cef_ext'
-        expect(e.get('[cef_ext][foo]')).to be == event.get('foo')
+        expect(e.get('deviceVendor')).to be == event.get('deviceVendor')
+        expect(e.get('deviceProduct')).to be == event.get('deviceProduct')
+        expect(e.get('deviceVersion')).to be == event.get('deviceVersion')
+        expect(e.get('deviceEventClassId')).to be == event.get('deviceEventClassId')
+        expect(e.get('name')).to be == event.get('name')
+        expect(e.get('severity')).to be == event.get('severity')
+        expect(e.get('foo')).to be == event.get('foo')
       end
     end
   end
