@@ -49,7 +49,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Fields to be included in CEV extension part as key/value pairs
   config :fields, :validate => :array, :default => []
 
-  # Add description here
+  # Set this flag if you want to have both v1 and v2 fields indexed at the same time. Note that this option will increase 
+  # the index size and data stored in outputs like Elasticsearch
+  # This option is available to ease transition to new schema
   config :deprecated_v1_fields, :validate => :boolean, :default => false, :deprecated => "This setting is being deprecated"
 
   HEADER_FIELDS = ['cefVersion','deviceVendor','deviceProduct','deviceVersion','deviceEventClassId','name','severity']
@@ -85,96 +87,59 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     # TODO: To solve all unescaping cases, regex is not suitable. A little parse should be written.
     split_data = data.split /(?<=[^\\]\\\\)[\|]|(?<!\\)[\|]/
 
-    # To be invoked when config settings is set to TRUE for V1 field names (cef_ext.<fieldname>) the following code might be removed in upcoming Codec revisions
-    deprecated_v1_fields = true
-    if deprecated_v1_fields #= true
-      # Store header fields
-      DEPRECATED_HEADER_FIELDS.each_with_index do |field_name, index|
-        store_header_field(event,field_name,split_data[index])
-      end
-      #Remainder is message
-      message = split_data[DEPRECATED_HEADER_FIELDS.size..-1].join('|')
-
-      # Try and parse out the syslog header if there is one
-      if event.get('cef_version').include? ' '
-        split_cef_version= event.get('cef_version').rpartition(' ')
-        event.set('syslog', split_cef_version[0])
-        event.set('cef_version',split_cef_version[2])
-      end
-
-      # Get rid of the CEF bit in the version
-      event.set('cef_version', event.get('cef_version').sub(/^CEF:/, ''))
-
-      # Strip any whitespace from the message
-      if not message.nil? and message.include? '='
-        message = message.strip
-
-        # If the last KVP has no value, add an empty string, this prevents hash errors below
-        if message.end_with?('=')
-          message=message + ' ' unless message.end_with?('\=')
-        end
-
-        # Now parse the key value pairs into it
-        extensions = {}
-        message = message.split(/ ([\w\.]+)=/)
-        key, value = message.shift.split('=', 2)
-        extensions[key] = value.gsub(/\\=/, '=').gsub(/\\\\/, '\\')
-        Hash[*message].each{ |k, v| extensions[k] = v }
-        # And save the new has as the extensions
-        event.set('cef_ext', extensions)
-      end
+    # To be invoked when config settings is set to TRUE for V1 field names (cef_ext.<fieldname>) the following code might be removed in upcoming Codec revision
+    if deprecated_v1_fields
+      handle_v1_fields(event, split_data)
     end
 
     # To be invoked with default config settings to utilise the new field name formatting and flatten out the JSON document
-    #if deprecated_v1_fields == false
-      # Store header fields
-      HEADER_FIELDS.each_with_index do |field_name, index|
-        store_header_field(event,field_name,split_data[index])
+    # Store header fields
+    HEADER_FIELDS.each_with_index do |field_name, index|
+      store_header_field(event,field_name,split_data[index])
+    end
+    #Remainder is message
+    message = split_data[HEADER_FIELDS.size..-1].join('|')
+
+    # Try and parse out the syslog header if there is one
+    if event.get('cefVersion').include? ' '
+      split_cef_version= event.get('cefVersion').rpartition(' ')
+      event.set('syslog', split_cef_version[0])
+      event.set('cefVersion',split_cef_version[2])
+    end
+
+    # Get rid of the CEF bit in the version
+    event.set('cefVersion', event.get('cefVersion').sub(/^CEF:/, ''))
+
+    # Strip any whitespace from the message
+    if not message.nil? and message.include? '='
+      message = message.strip
+
+      # If the last KVP has no value, add an empty string, this prevents hash errors below
+      if message.end_with?('=')
+        message = message + ' ' unless message.end_with?('\=')
       end
-      #Remainder is message
-      message = split_data[HEADER_FIELDS.size..-1].join('|')
 
-      # Try and parse out the syslog header if there is one
-      if event.get('cefVersion').include? ' '
-        split_cef_version= event.get('cefVersion').rpartition(' ')
-        event.set('syslog', split_cef_version[0])
-        event.set('cefVersion',split_cef_version[2])
+      # Insert custom delimiter to separate key-value pairs, to which some values will contain special characters
+      # This separator '|^^^' os tested to be unique
+      message = message.gsub((/\s+(\w+=)/),'|^^^\1')
+
+      # This portion strips out the additional fields from the CEF logs, if needed, the ArcSight connectors will need to map it accordingly
+      # Also implemented to safeguard the {dot} notations in ES versions below 2.4x
+      message = message.gsub((/ (ad\.\w+.*\]\=[^|^^^]+)/),'')
+      message = message.split('|^^^')
+
+      # Replaces the '=' with '***' to avoid conflict with strings with HTML content namely key-value pairs where the values contain HTML strings
+      # Example : requestUrl = http://<testdomain>:<port>?query=A
+      for i in 0..message.length-1
+        message[i] = message[i].sub(/\=/, "***")
+        message[i] = message[i].gsub(/\\=/, '=').gsub(/\\\\/, '\\')
       end
 
-      # Get rid of the CEF bit in the version
-      event.set('cefVersion', event.get('cefVersion').sub(/^CEF:/, ''))
-
-      # Strip any whitespace from the message
-      if not message.nil? and message.include? '='
-        message = message.strip
-
-        # If the last KVP has no value, add an empty string, this prevents hash errors below
-        if message.end_with?('=')
-          message = message + ' ' unless message.end_with?('\=')
-        end
-
-        # Insert custom delimiter to separate key-value pairs, to which some values will contain special characters
-        # This separator '|^^^' os tested to be unique
-        message = message.gsub((/\s+(\w+=)/),'|^^^\1')
-
-        # This portion strips out the additional fields from the CEF logs, if needed, the ArcSight connectors will need to map it accordingly
-        # Also implemented to safeguard the {dot} notations in ES versions below 2.4x
-        message = message.gsub((/ (ad\.\w+.*\]\=[^|^^^]+)/),'')
-        message = message.split('|^^^')
-
-        # Replaces the '=' with '***' to avoid conflict with strings with HTML content namely key-value pairs where the values contain HTML strings
-        # Example : requestUrl = http://<testdomain>:<port>?query=A
-        for i in 0..message.length-1
-          message[i] = message[i].sub(/\=/, "***")
-          message[i] = message[i].gsub(/\\=/, '=').gsub(/\\\\/, '\\')
-        end
-
-        message = message.map {|s| k, v = s.split('***'); "#{MAPPINGS[k] || k }=#{v}"}
-        message = message.each_with_object({}) do |k|
-          key, value = k.split(/\s*=\s*/,2)
-          event.set(key, value)
-        end
-      #end
+      message = message.map {|s| k, v = s.split('***'); "#{MAPPINGS[k] || k }=#{v}"}
+      message = message.each_with_object({}) do |k|
+        key, value = k.split(/\s*=\s*/,2)
+        event.set(key, value)
+      end
     end
 
     yield event
@@ -294,5 +259,44 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   rescue TypeError, ArgumentError
     false
   end
+  
+  def handle_v1_fields(event, split_data)
+    # Store header fields
+    DEPRECATED_HEADER_FIELDS.each_with_index do |field_name, index|
+      store_header_field(event,field_name,split_data[index])
+    end
+    #Remainder is message
+    message = split_data[DEPRECATED_HEADER_FIELDS.size..-1].join('|')
+
+    # Try and parse out the syslog header if there is one
+    if event.get('cef_version').include? ' '
+      split_cef_version= event.get('cef_version').rpartition(' ')
+      event.set('syslog', split_cef_version[0])
+      event.set('cef_version',split_cef_version[2])
+    end
+
+    # Get rid of the CEF bit in the version
+    event.set('cef_version', event.get('cef_version').sub(/^CEF:/, ''))
+
+    # Strip any whitespace from the message
+    if not message.nil? and message.include? '='
+      message = message.strip
+
+      # If the last KVP has no value, add an empty string, this prevents hash errors below
+      if message.end_with?('=')
+        message=message + ' ' unless message.end_with?('\=')
+      end
+
+      # Now parse the key value pairs into it
+      extensions = {}
+      message = message.split(/ ([\w\.]+)=/)
+      key, value = message.shift.split('=', 2)
+      extensions[key] = value.gsub(/\\=/, '=').gsub(/\\\\/, '\\')
+      Hash[*message].each{ |k, v| extensions[k] = v }
+      # And save the new has as the extensions
+      event.set('cef_ext', extensions)
+    end
+
+  end  
 
 end
