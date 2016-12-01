@@ -14,6 +14,22 @@ describe LogStash::Codecs::CEF do
 
     let(:results)   { [] }
 
+    context "with delimiter set" do 
+      # '\r\n' in single quotes to simulate the real input from a config
+      # containing \r\n as 4-character sequence in the config:
+      #
+      #   delimiter => "\r\n"
+      #
+      # Related: https://github.com/elastic/logstash/issues/1645
+      subject(:codec) { LogStash::Codecs::CEF.new("delimiter" => '\r\n') }
+
+      it "should append the delimiter to the result" do
+        codec.on_event { |data, newdata| results << newdata }
+        codec.encode(LogStash::Event.new({}))
+        expect(results.first).to end_with("\r\n")
+      end
+    end
+
     it "should not fail if fields is nil" do
       codec.on_event{|data, newdata| results << newdata}
       event = LogStash::Event.new("foo" => "bar")
@@ -326,6 +342,28 @@ describe LogStash::Codecs::CEF do
       insist { e.get('deviceEventClassId') } == "100"
       insist { e.get('name') } == "trojan successfully stopped"
       insist { e.get('severity') } == "10"
+    end
+
+    context "with delimiter set" do 
+      # '\r\n' in single quotes to simulate the real input from a config
+      # containing \r\n as 4-character sequence in the config:
+      #
+      #   delimiter => "\r\n"
+      #
+      # Related: https://github.com/elastic/logstash/issues/1645
+      subject(:codec) { LogStash::Codecs::CEF.new("delimiter" => '\r\n') }
+
+      it "should parse on the delimiter " do
+        subject.decode(message) do |e|
+          raise Exception.new("Should not get here. If we do, it means the decoder emitted an event before the delimiter was seen?")
+        end
+
+        subject.decode("\r\n") do |e|
+          validate(e)
+          insist { e.get("deviceVendor") } == "security"
+          insist { e.get("deviceProduct") } == "threatmanager"
+        end
+      end
     end
 
     it "should parse the cef headers" do

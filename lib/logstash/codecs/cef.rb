@@ -1,4 +1,5 @@
 # encoding: utf-8
+require "logstash/util/buftok"
 require "logstash/codecs/base"
 require "json"
 
@@ -57,6 +58,23 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # This option is available to ease transition to new schema
   config :deprecated_v1_fields, :validate => :boolean, :default => false, :deprecated => "This setting is being deprecated"
 
+  # If your input puts a delimiter between each CEF event, you'll want to set
+  # this to be that delimiter.
+  #
+  # For example, with the TCP input, you probably want to put this:
+  #
+  #     input {
+  #       tcp {
+  #         codec => cef { delimiter => "\r\n"
+  #       }
+  #     }
+  #
+  # This setting allows the following character sequences to have special meaning:
+  #
+  # * `\\r` (backslash "r") - means carriage return (ASCII 0x0D)
+  # * `\\n` (backslash "n") - means newline (ASCII 0x0A)
+  config :delimiter, :validate => :string
+
   HEADER_FIELDS = ['cefVersion','deviceVendor','deviceProduct','deviceVersion','deviceEventClassId','name','severity']
 
   # Translating and flattening the CEF extensions with known field names as documented in the Common Event Format whitepaper
@@ -67,6 +85,13 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   public
   def initialize(params={})
     super(params)
+    if @delimiter
+      # Logstash configuration doesn't have built-in support for escaping,
+      # so we implement it here. Feature discussion for escaping is here:
+      #   https://github.com/elastic/logstash/issues/1645
+      @delimiter = @delimiter.gsub("\\r", "\r").gsub("\\n", "\n")
+      @buffer = FileWatch::BufferedTokenizer.new(@delimiter)
+    end
   end
 
   private
@@ -76,7 +101,17 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   end
 
   public
-  def decode(data)
+  def decode(data, &block)
+    if @delimiter
+      @buffer.extract(data).each do |line|
+        handle(line, &block)
+      end
+    else
+      handle(data, &block)
+    end
+  end
+
+  def handle(data, &block)
     # Strip any quotations at the start and end, flex connectors seem to send this
     if data[0] == "\""
       data = data[1..-2]
@@ -181,7 +216,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     header = ["CEF:0", vendor, product, version, signature, name, severity].join("|")
     values = @fields.map {|fieldname| get_value(fieldname, event)}.compact.join(" ")
 
-    @on_event.call(event, "#{header}|#{values}\n")
+    @on_event.call(event, "#{header}|#{values}#{@delimiter}")
   end
 
   private
