@@ -1,9 +1,9 @@
-## 3.1.0
- - add _cefparsefailure tag on failed decode
+## 4.0.0
+ - Implements the dictionary translation for abbreviated CEF field names from chapter Chapter 2: ArcSight Extension Dictionary    page 3 of 39 [CEF specification](https://protect724.hp.com/docs/DOC-1072).
+ - add `_cefparsefailure` tag on failed decode
 
 ## 3.0.0
  - breaking: Updated plugin to use new Java Event APIs
- - Implements the dictionary translation for abbreviated CEF field names from chapter Chapter 2: ArcSight Extension Dictionary page 3 of 39 [CEF specification](https://protect724.hp.com/docs/DOC-1072). 
 
 ## 2.1.3
  - Switch in-place sub! to sub when extracting `cef_version`. new Logstash Java Event does not support in-place String changes.
