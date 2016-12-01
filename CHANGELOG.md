@@ -1,8 +1,10 @@
-## 4.0.0
- - Implements the dictionary translation for abbreviated CEF field names from chapter Chapter 2: ArcSight Extension Dictionary    page 3 of 39 [CEF specification](https://protect724.hp.com/docs/DOC-1072).
- - add `_cefparsefailure` tag on failed decode
+## 4.0.1
  - changed rt from receiptTime to deviceReceiptTime (ref:p27/39)
- - changed the regex to remove additionalFields 
+ - changed the regex to remove additionalFields
+
+## 4.0.0
+ - Implements the dictionary translation for abbreviated CEF field names from chapter Chapter 2: ArcSight Extension Dictionary page 3 of 39 [CEF specification](https://protect724.hp.com/docs/DOC-1072).
+ - add `_cefparsefailure` tag on failed decode
 
 ## 3.0.0
  - breaking: Updated plugin to use new Java Event APIs
