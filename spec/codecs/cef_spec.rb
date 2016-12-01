@@ -452,7 +452,7 @@ describe LogStash::Codecs::CEF do
       end
     end
 
-    let (:trim_additional_fields_with_dot_notations) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 ad.field[0]=field0 ad.name[1]=new_name'}
+    let (:trim_additional_fields_with_dot_notations) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 ad.Authentification=MICROSOFT_AUTHENTICATION_PACKAGE_V1_0 ad.Error_,Code=3221225578 dst=12.121.122.82 ad.field[0]=field0 ad.name[1]=new_name'}
     it "should remove ad.fields" do
       subject.decode(trim_additional_fields_with_dot_notations) do |e|
         validate(e)
@@ -464,7 +464,7 @@ describe LogStash::Codecs::CEF do
     end
 
     let (:preserve_unmatched_key_mappings) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 new_key_by_device=new_values here'}
-    it "should remove ad.fields" do
+    it "should preserve unmatched key mappings" do
       subject.decode(preserve_unmatched_key_mappings) do |e|
         validate(e)
         insist { e.get("sourceAddress") } == "10.0.0.192"
@@ -495,7 +495,7 @@ describe LogStash::Codecs::CEF do
       end
     end
   end
-  
+
   context "decode with deprecated version option" do
     let (:message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
     let(:options) {
@@ -503,10 +503,10 @@ describe LogStash::Codecs::CEF do
         "deprecated_v1_fields" => true
       }
     }
-    
+
     subject(:codec) { LogStash::Codecs::CEF.new(options) }
-    
-    def validate(e) 
+
+    def validate(e)
       insist { e.is_a?(LogStash::Event) }
       insist { e.get('cef_version') } == "0"
       insist { e.get('cef_device_version') } == "1.0"
@@ -548,7 +548,7 @@ describe LogStash::Codecs::CEF do
       subject.decode(no_ext) do |e|
         validate(e)
         insist { e.get("cef_ext") } == nil
-      end 
+      end
     end
 
     let (:missing_headers) { "CEF:0|||1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
@@ -559,14 +559,14 @@ describe LogStash::Codecs::CEF do
         insist { e.get("cef_product") } == ""
         insist { e.get("deviceVendor") } == ""
         insist { e.get("deviceProduct") } == ""
-      end 
+      end
     end
 
     let (:leading_whitespace) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10| src=10.0.0.192 dst=12.121.122.82 spt=1232" }
     it "should strip leading whitespace from the message" do
       subject.decode(leading_whitespace) do |e|
         validate(e)
-      end 
+      end
     end
 
     let (:escaped_pipes) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this\|has an escaped pipe' }
@@ -574,7 +574,7 @@ describe LogStash::Codecs::CEF do
       subject.decode(escaped_pipes) do |e|
         ext = e.get('cef_ext')
         insist { ext['moo'] } == 'this\|has an escaped pipe'
-      end 
+      end
     end
 
     let (:pipes_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this|has an pipe'}

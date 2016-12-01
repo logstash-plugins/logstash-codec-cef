@@ -52,7 +52,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Fields to be included in CEV extension part as key/value pairs
   config :fields, :validate => :array, :default => []
 
-  # Set this flag if you want to have both v1 and v2 fields indexed at the same time. Note that this option will increase 
+  # Set this flag if you want to have both v1 and v2 fields indexed at the same time. Note that this option will increase
   # the index size and data stored in outputs like Elasticsearch
   # This option is available to ease transition to new schema
   config :deprecated_v1_fields, :validate => :boolean, :default => false, :deprecated => "This setting is being deprecated"
@@ -60,7 +60,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   HEADER_FIELDS = ['cefVersion','deviceVendor','deviceProduct','deviceVersion','deviceEventClassId','name','severity']
 
   # Translating and flattening the CEF extensions with known field names as documented in the Common Event Format whitepaper
-  MAPPINGS = { "act" => "deviceAction", "app" => "applicationProtocol", "c6a1" => "deviceCustomIPv6Address1", "c6a1Label" => "deviceCustomIPv6Address1Label", "c6a2" => "deviceCustomIPv6Address2", "c6a2Label" => "deviceCustomIPv6Address2Label", "c6a3" => "deviceCustomIPv6Address3", "c6a3Label" => "deviceCustomIPv6Address3Label", "c6a4" => "deviceCustomIPv6Address4", "c6a4Label" => "deviceCustomIPv6Address4Label", "cat" => "deviceEventCategory", "cfp1" => "deviceCustomFloatingPoint1", "cfp1Label" => "deviceCustomFloatingPoint1Label", "cfp2" => "deviceCustomFloatingPoint2", "cfp2Label" => "deviceCustomFloatingPoint2", "cfp3" => "deviceCustomFloatingPoint3", "cfp3Label" => "deviceCustomFloatingPoint4Label", "cfp4" => "deviceCustomFloatingPoint4", "cfp4Label" => "deviceCustomFloatingPoint4Label", "cn1" => "deviceCustomNumber1", "cn1Label" => "deviceCustomNumber1Label", "cn2" => "deviceCustomNumber2", "cn2Label" => "deviceCustomNumber2Label", "cn3" => "deviceCustomNumber3", "cn3Label" => "deviceCustomNumber3Label", "cnt" => "baseEventCount", "cs1" => "deviceCustomString1", "cs1Label" => "deviceCustomString1Label", "cs2" => "deviceCustomString2", "cs2Label" => "deviceCustomString2Label", "cs3" => "deviceCustomString3", "cs3Label" => "deviceCustomString3Label", "cs4" => "deviceCustomString4", "cs4Label" => "deviceCustomString4Label", "cs5" => "deviceCustomString5", "cs5Label" => "deviceCustomString5Label", "cs6" => "deviceCustomString6", "cs6Label" => "deviceCustomString6Label", "dhost" => "destinationHostName", "dmac" => "destinationMacAddress", "dntdom" => "destinationNTDomain", "dpid" => "destinationProcessId", "dpriv" => "destinationUserPrivileges", "dproc" => "destinationProcessName", "dpt" => "destinationPort", "dst" => "destinationAddress", "duid" => "destinationUserId", "duser" => "destinationUserName", "dvc" => "deviceAddress", "dvchost" => "deviceHostName", "dvcpid" => "deviceProcessId", "end" => "endTime", "fname" => "fileName", "fsize" => "fileSize", "in" => "bytesIn", "msg" => "message", "out" => "bytesOut", "proto" => "transportProtocol", "request" => "requestUrl", "rt" => "receiptTime", "shost" => "sourceHostName", "smac" => "sourceMacAddress", "sntdom" => "sourceNtDomain", "spid" => "sourceProcessId", "spriv" => "sourceUserPrivileges", "sproc" => "sourceProcessName", "spt" => "sourcePort", "src" => "sourceAddress", "start" => "startTime", "suid" => "sourceUserId", "suser" => "sourceUserName", "ahost" => "agentHost", "art" => "agentReceiptTime", "at" => "agentType", "aid" => "agentId", "_cefVer" => "cefVersion", "agt" => "agentAddress", "av" => "agentVersion", "atz" => "agentTimeZone", "dtz" => "destinationTimeZone", "slong" => "sourceLongitude", "slat" => "sourceLatitude", "dlong" => "destinationLongitude", "dlat" => "destinationLatitude", "catdt" => "categoryDeviceType", "mrt" => "managerReceiptTime" }
+  MAPPINGS = { "act" => "deviceAction", "app" => "applicationProtocol", "c6a1" => "deviceCustomIPv6Address1", "c6a1Label" => "deviceCustomIPv6Address1Label", "c6a2" => "deviceCustomIPv6Address2", "c6a2Label" => "deviceCustomIPv6Address2Label", "c6a3" => "deviceCustomIPv6Address3", "c6a3Label" => "deviceCustomIPv6Address3Label", "c6a4" => "deviceCustomIPv6Address4", "c6a4Label" => "deviceCustomIPv6Address4Label", "cat" => "deviceEventCategory", "cfp1" => "deviceCustomFloatingPoint1", "cfp1Label" => "deviceCustomFloatingPoint1Label", "cfp2" => "deviceCustomFloatingPoint2", "cfp2Label" => "deviceCustomFloatingPoint2", "cfp3" => "deviceCustomFloatingPoint3", "cfp3Label" => "deviceCustomFloatingPoint4Label", "cfp4" => "deviceCustomFloatingPoint4", "cfp4Label" => "deviceCustomFloatingPoint4Label", "cn1" => "deviceCustomNumber1", "cn1Label" => "deviceCustomNumber1Label", "cn2" => "deviceCustomNumber2", "cn2Label" => "deviceCustomNumber2Label", "cn3" => "deviceCustomNumber3", "cn3Label" => "deviceCustomNumber3Label", "cnt" => "baseEventCount", "cs1" => "deviceCustomString1", "cs1Label" => "deviceCustomString1Label", "cs2" => "deviceCustomString2", "cs2Label" => "deviceCustomString2Label", "cs3" => "deviceCustomString3", "cs3Label" => "deviceCustomString3Label", "cs4" => "deviceCustomString4", "cs4Label" => "deviceCustomString4Label", "cs5" => "deviceCustomString5", "cs5Label" => "deviceCustomString5Label", "cs6" => "deviceCustomString6", "cs6Label" => "deviceCustomString6Label", "dhost" => "destinationHostName", "dmac" => "destinationMacAddress", "dntdom" => "destinationNTDomain", "dpid" => "destinationProcessId", "dpriv" => "destinationUserPrivileges", "dproc" => "destinationProcessName", "dpt" => "destinationPort", "dst" => "destinationAddress", "duid" => "destinationUserId", "duser" => "destinationUserName", "dvc" => "deviceAddress", "dvchost" => "deviceHostName", "dvcpid" => "deviceProcessId", "end" => "endTime", "fname" => "fileName", "fsize" => "fileSize", "in" => "bytesIn", "msg" => "message", "out" => "bytesOut", "proto" => "transportProtocol", "request" => "requestUrl", "rt" => "deviceReceiptTime", "shost" => "sourceHostName", "smac" => "sourceMacAddress", "sntdom" => "sourceNtDomain", "spid" => "sourceProcessId", "spriv" => "sourceUserPrivileges", "sproc" => "sourceProcessName", "spt" => "sourcePort", "src" => "sourceAddress", "start" => "startTime", "suid" => "sourceUserId", "suser" => "sourceUserName", "ahost" => "agentHost", "art" => "agentReceiptTime", "at" => "agentType", "aid" => "agentId", "_cefVer" => "cefVersion", "agt" => "agentAddress", "av" => "agentVersion", "atz" => "agentTimeZone", "dtz" => "destinationTimeZone", "slong" => "sourceLongitude", "slat" => "sourceLatitude", "dlong" => "destinationLongitude", "dlat" => "destinationLatitude", "catdt" => "categoryDeviceType", "mrt" => "managerReceiptTime" }
 
   DEPRECATED_HEADER_FIELDS = ['cef_version','cef_vendor','cef_product','cef_device_version','cef_sigid','cef_name','cef_severity']
 
@@ -128,7 +128,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
       # This portion strips out the additional fields from the CEF logs, if needed, the ArcSight connectors will need to map it accordingly
       # Also implemented to safeguard the {dot} notations in ES versions below 2.4x
-      message = message.gsub((/ (ad\.\w+.*\]\=[^|^^^]+)/),'')
+      message = message.gsub((/(?:(\s*ad\.[^\=]+\=[^|^^^]+))/),'')
       message = message.split('|^^^')
 
       # Replaces the '=' with '***' to avoid conflict with strings with HTML content namely key-value pairs where the values contain HTML strings
@@ -265,7 +265,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   rescue TypeError, ArgumentError
     false
   end
-  
+
   def handle_v1_fields(event, split_data)
     # Store header fields
     DEPRECATED_HEADER_FIELDS.each_with_index do |field_name, index|
@@ -303,6 +303,6 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       event.set('cef_ext', extensions)
     end
 
-  end  
+  end
 
 end
