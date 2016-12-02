@@ -40,7 +40,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Defined as field of type string to allow sprintf. The value will be validated
   # to be an integer in the range from 0 to 10 (including).
   # All invalid values will be mapped to the default of 6.
-  config :sev, :validate => :string, :default => "6", :deprecated => "This setting is being deprecated, use :severity instead."
+  config :sev, :validate => :string, :deprecated => "This setting is being deprecated, use :severity instead."
 
   # Severity field in CEF header. The new value can include `%{foo}` strings
   # to help you build a new value from other parts of the event.
@@ -56,7 +56,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Set this flag if you want to have both v1 and v2 fields indexed at the same time. Note that this option will increase 
   # the index size and data stored in outputs like Elasticsearch
   # This option is available to ease transition to new schema
-  config :deprecated_v1_fields, :validate => :boolean, :default => false, :deprecated => "This setting is being deprecated"
+  config :deprecated_v1_fields, :validate => :boolean, :deprecated => "This setting is being deprecated"
 
   # If your input puts a delimiter between each CEF event, you'll want to set
   # this to be that delimiter.
@@ -208,7 +208,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
     # :sev is deprecated and therefore only considered if :severity equals the default setting or is invalid
     severity = sanitize_severity(event, @severity)
-    if severity == self.class.get_config["severity"][:default]
+    if severity == self.class.get_config["severity"][:default] && @sev
       # Use deprecated setting sev
       severity = sanitize_severity(event, @sev)
     end
