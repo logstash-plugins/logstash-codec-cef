@@ -358,11 +358,15 @@ describe LogStash::Codecs::CEF do
           raise Exception.new("Should not get here. If we do, it means the decoder emitted an event before the delimiter was seen?")
         end
 
+        event = false;
         subject.decode("\r\n") do |e|
           validate(e)
           insist { e.get("deviceVendor") } == "security"
           insist { e.get("deviceProduct") } == "threatmanager"
+          event = true
         end
+
+        expect(event).to be_truthy
       end
     end
 
