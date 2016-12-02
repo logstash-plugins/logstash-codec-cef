@@ -65,7 +65,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   #
   #     input {
   #       tcp {
-  #         codec => cef { delimiter => "\r\n"
+  #         codec => cef { delimiter => "\r\n" }
+  #         # ... 
   #       }
   #     }
   #
