@@ -1,3 +1,6 @@
+## 4.1.0
+ - Add `delimiter` setting. This allows the decoder to be used with inputs like the TCP input where event delimiters are used.
+
 ## 4.0.0
  - Implements the dictionary translation for abbreviated CEF field names from chapter Chapter 2: ArcSight Extension Dictionary    page 3 of 39 [CEF specification](https://protect724.hp.com/docs/DOC-1072).
  - add `_cefparsefailure` tag on failed decode
