@@ -1,6 +1,11 @@
+<<<<<<< HEAD
 ## 4.0.1
  - changed rt from receiptTime to deviceReceiptTime (ref:p27/39)
  - changed the regex to remove additionalFields
+=======
+## 4.1.0
+ - Add `delimiter` setting. This allows the decoder to be used with inputs like the TCP input where event delimiters are used.
+>>>>>>> 99ff588705a8c5e13c363bf8e746205224aba0c8
 
 ## 4.0.0
  - Implements the dictionary translation for abbreviated CEF field names from chapter Chapter 2: ArcSight Extension Dictionary page 3 of 39 [CEF specification](https://protect724.hp.com/docs/DOC-1072).
