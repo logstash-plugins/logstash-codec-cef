@@ -460,6 +460,8 @@ describe LogStash::Codecs::CEF do
         insist { e.get("destinationAddress") } == "12.121.122.82"
         insist { e.get("ad.field[0]") } == nil
         insist { e.get("ad.name[1]") } == nil
+        insist { e.get("ad.Authentification") } == nil
+        insist { e.get("ad.Error_,Code") } == nil
       end
     end
 
