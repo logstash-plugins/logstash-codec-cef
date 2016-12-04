@@ -1,7 +1,7 @@
 
 ## 4.1.1
  - changed rt from receiptTime to deviceReceiptTime (ref:p27/39)
- - changed the regex to remove additionalFields
+ - changed tokenizer to include additional fields (ad.fieldname)
 
 ## 4.1.0
  - Add `delimiter` setting. This allows the decoder to be used with inputs like the TCP input where event delimiters are used.
