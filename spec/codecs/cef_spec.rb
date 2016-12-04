@@ -14,7 +14,7 @@ describe LogStash::Codecs::CEF do
 
     let(:results)   { [] }
 
-    context "with delimiter set" do 
+    context "with delimiter set" do
       # '\r\n' in single quotes to simulate the real input from a config
       # containing \r\n as 4-character sequence in the config:
       #
@@ -344,7 +344,7 @@ describe LogStash::Codecs::CEF do
       insist { e.get('severity') } == "10"
     end
 
-    context "with delimiter set" do 
+    context "with delimiter set" do
       # '\r\n' in single quotes to simulate the real input from a config
       # containing \r\n as 4-character sequence in the config:
       #
@@ -494,16 +494,16 @@ describe LogStash::Codecs::CEF do
       end
     end
 
-    let (:trim_additional_fields_with_dot_notations) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 ad.Authentification=MICROSOFT_AUTHENTICATION_PACKAGE_V1_0 ad.Error_,Code=3221225578 dst=12.121.122.82 ad.field[0]=field0 ad.name[1]=new_name'}
-    it "should remove ad.fields" do
-      subject.decode(trim_additional_fields_with_dot_notations) do |e|
+    let (:preserve_additional_fields_with_dot_notations) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 ad.Authentification=MICROSOFT_AUTHENTICATION_PACKAGE_V1_0 ad.Error_,Code=3221225578 dst=12.121.122.82 ad.field[0]=field0 ad.name[1]=new_name'}
+    it "should keep ad.fields" do
+      subject.decode(preserve_additional_fields_with_dot_notations) do |e|
         validate(e)
         insist { e.get("sourceAddress") } == "10.0.0.192"
         insist { e.get("destinationAddress") } == "12.121.122.82"
-        insist { e.get("ad.field[0]") } == nil
-        insist { e.get("ad.name[1]") } == nil
-        insist { e.get("ad.Authentification") } == nil
-        insist { e.get("ad.Error_,Code") } == nil
+        insist { e.get("ad.field[0]") } == "field0"
+        insist { e.get("ad.name[1]") } == "new_name"
+        insist { e.get("ad.Authentification") } == "MICROSOFT_AUTHENTICATION_PACKAGE_V1_0"
+        insist { e.get("ad.Error_,Code") } == "3221225578"
       end
     end
 

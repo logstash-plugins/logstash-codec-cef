@@ -66,7 +66,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   #     input {
   #       tcp {
   #         codec => cef { delimiter => "\r\n" }
-  #         # ... 
+  #         # ...
   #       }
   #     }
   #
@@ -160,11 +160,12 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
       # Insert custom delimiter to separate key-value pairs, to which some values will contain special characters
       # This separator '|^^^' os tested to be unique
-      message = message.gsub((/\s+(\w+=)/),'|^^^\1')
+      message = message.gsub((/(?:(\s+(\w+\=)))/),'|^^^\2')
 
-      # This portion strips out the additional fields from the CEF logs, if needed, the ArcSight connectors will need to map it accordingly
-      # Also implemented to safeguard the {dot} notations in ES versions below 2.4x
-      message = message.gsub((/(?:(\s*ad\.[^\=]+\=[^|^^^]+))/),'')
+      # Appropriately tokenizing the additional fields when ArcSight connectors are sending events using "COMPLETE" mode processing.
+      # If these fields are NOT needed, then set the ArcSight processing mode for this destination to "FASTER" or "FASTEST"
+      # Refer to ArcSight's SmartConnector user configuration guide
+      message = message.gsub((/(?:(\s+((([A-Za-z]{2})|([Aa]dditional))\.[^\=]+\=)))/),'|^^^\2')
       message = message.split('|^^^')
 
       # Replaces the '=' with '***' to avoid conflict with strings with HTML content namely key-value pairs where the values contain HTML strings
