@@ -1,3 +1,5 @@
+## 4.1.2
+ - added mapping for outcome = eventOutcome from CEF whitepaper (ref:p26/39)
 
 ## 4.1.1
  - changed rt from receiptTime to deviceReceiptTime (ref:p27/39)
