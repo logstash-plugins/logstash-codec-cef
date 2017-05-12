@@ -555,6 +555,18 @@ describe LogStash::Codecs::CEF do
         insist { e.get('syslog') } == 'Syslogdate Sysloghost'
       end
     end
+
+    context "with raw_data_field set" do
+      subject(:codec) { LogStash::Codecs::CEF.new("raw_data_field" => "message_raw") }
+
+      it "should return the raw message in field message_raw" do
+        subject.decode(message) do |e|
+          validate(e)
+          insist { e.get("message_raw") } == message
+        end
+      end
+    end
+
   end
 
   context "decode with deprecated version option" do

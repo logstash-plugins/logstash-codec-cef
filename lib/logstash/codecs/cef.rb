@@ -76,6 +76,10 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # * `\\n` (backslash "n") - means newline (ASCII 0x0A)
   config :delimiter, :validate => :string
 
+  # If raw_data_field is set, during decode of an event an additional field with
+  # the provided name is added, which contains the raw data.
+  config :raw_data_field, :validate => :string
+
   HEADER_FIELDS = ['cefVersion','deviceVendor','deviceProduct','deviceVersion','deviceEventClassId','name','severity']
 
   # Translating and flattening the CEF extensions with known field names as documented in the Common Event Format whitepaper
@@ -113,11 +117,13 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   end
 
   def handle(data, &block)
+    event = LogStash::Event.new
+    event.set(raw_data_field, data) unless raw_data_field.nil?
+
     # Strip any quotations at the start and end, flex connectors seem to send this
     if data[0] == "\""
       data = data[1..-2]
     end
-    event = LogStash::Event.new
 
     # Split by the pipes, pipes in the extension part are perfectly valid and do not need escaping
     # The better solution for the splitting regex would be /(?<!\\(\\\\)*)[\|]/, but this
