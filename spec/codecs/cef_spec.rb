@@ -335,13 +335,13 @@ describe LogStash::Codecs::CEF do
   context "#decode" do
     let (:message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
 
-    def validate(e)
+    def validate(e, target = '')
       insist { e.is_a?(LogStash::Event) }
-      insist { e.get('cefVersion') } == "0"
-      insist { e.get('deviceVersion') } == "1.0"
-      insist { e.get('deviceEventClassId') } == "100"
-      insist { e.get('name') } == "trojan successfully stopped"
-      insist { e.get('severity') } == "10"
+      insist { e.get(target + '[cefVersion]') } == "0"
+      insist { e.get(target + '[deviceVersion]') } == "1.0"
+      insist { e.get(target + '[deviceEventClassId]') } == "100"
+      insist { e.get(target + '[name]') } == "trojan successfully stopped"
+      insist { e.get(target + '[severity]') } == "10"
     end
 
     context "with delimiter set" do
@@ -567,6 +567,35 @@ describe LogStash::Codecs::CEF do
       end
     end
 
+    context "with target set to a field" do
+      subject(:codec) { LogStash::Codecs::CEF.new("target" => "cef") }
+
+      it "should create all fields within this target (cef)" do
+        subject.decode(message) do |e|
+          validate(e, '[cef]')
+        end
+      end
+    end
+
+    context "with target set to a field (with brackets)" do
+      subject(:codec) { LogStash::Codecs::CEF.new("target" => "[cef]") }
+
+      it "should create all fields within this target ([cef])" do
+        subject.decode(message) do |e|
+          validate(e, '[cef]')
+        end
+      end
+    end
+
+    context "with target set to a nested field" do
+      subject(:codec) { LogStash::Codecs::CEF.new("target" => "[cef][nested]") }
+
+      it "should create all fields within this target ([cef][nested])" do
+        subject.decode(message) do |e|
+          validate(e, '[cef][nested]')
+        end
+      end
+    end
   end
 
   context "decode with deprecated version option" do
@@ -579,18 +608,18 @@ describe LogStash::Codecs::CEF do
 
     subject(:codec) { LogStash::Codecs::CEF.new(options) }
 
-    def validate(e)
+    def validate(e, target = '')
       insist { e.is_a?(LogStash::Event) }
-      insist { e.get('cef_version') } == "0"
-      insist { e.get('cef_device_version') } == "1.0"
-      insist { e.get('cef_sigid') } == "100"
-      insist { e.get('cef_name') } == "trojan successfully stopped"
-      insist { e.get('cef_severity') } == "10"
-      insist { e.get('cefVersion') } == "0"
-      insist { e.get('deviceVersion') } == "1.0"
-      insist { e.get('deviceEventClassId') } == "100"
-      insist { e.get('name') } == "trojan successfully stopped"
-      insist { e.get('severity') } == "10"
+      insist { e.get(target + '[cef_version]') } == "0"
+      insist { e.get(target + '[cef_device_version]') } == "1.0"
+      insist { e.get(target + '[cef_sigid]') } == "100"
+      insist { e.get(target + '[cef_name]') } == "trojan successfully stopped"
+      insist { e.get(target + '[cef_severity]') } == "10"
+      insist { e.get(target + '[cefVersion]') } == "0"
+      insist { e.get(target + '[deviceVersion]') } == "1.0"
+      insist { e.get(target + '[deviceEventClassId]') } == "100"
+      insist { e.get(target + '[name]') } == "trojan successfully stopped"
+      insist { e.get(target + '[severity]') } == "10"
     end
 
     it "should parse the cef headers" do
@@ -737,6 +766,36 @@ describe LogStash::Codecs::CEF do
       it "Should detect headers before CEF starts" do
         subject.decode(message) do |e|
           insist { e.get('tags') } == ['_cefparsefailure']
+        end
+      end
+    end
+
+    context "with target set to a field" do
+      subject(:codec) { LogStash::Codecs::CEF.new("deprecated_v1_fields" => true, "target" => "cef") }
+
+      it "should create all fields within this target (cef)" do
+        subject.decode(message) do |e|
+          validate(e, '[cef]')
+        end
+      end
+    end
+
+    context "with target set to a field (with brackets)" do
+      subject(:codec) { LogStash::Codecs::CEF.new("deprecated_v1_fields" => true, "target" => "[cef]") }
+
+      it "should create all fields within this target ([cef])" do
+        subject.decode(message) do |e|
+          validate(e, '[cef]')
+        end
+      end
+    end
+
+    context "with target set to a nested field" do
+      subject(:codec) { LogStash::Codecs::CEF.new("deprecated_v1_fields" => true, "target" => "[cef][nested]") }
+
+      it "should create all fields within this target ([cef][nested])" do
+        subject.decode(message) do |e|
+          validate(e, '[cef][nested]')
         end
       end
     end

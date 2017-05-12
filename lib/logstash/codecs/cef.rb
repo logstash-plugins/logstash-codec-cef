@@ -80,6 +80,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # the provided name is added, which contains the raw data.
   config :raw_data_field, :validate => :string
 
+  # Specify into what field you want the CEF data to be stored.
+  config :target, :validate => :string
+
   HEADER_FIELDS = ['cefVersion','deviceVendor','deviceProduct','deviceVersion','deviceEventClassId','name','severity']
 
   # Translating and flattening the CEF extensions with known field names as documented in the Common Event Format whitepaper
@@ -97,12 +100,27 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       @delimiter = @delimiter.gsub("\\r", "\r").gsub("\\n", "\n")
       @buffer = FileWatch::BufferedTokenizer.new(@delimiter)
     end
+
+    @target_field = structured_field(target)
   end
 
   private
   def store_header_field(event,field_name,field_data)
     #Unescape pipes and backslash in header fields
-    event.set(field_name,field_data.gsub(/\\\|/, '|').gsub(/\\\\/, '\\')) unless field_data.nil?
+    event.set(@target_field + structured_field(field_name),field_data.gsub(/\\\|/, '|').gsub(/\\\\/, '\\')) unless field_data.nil?
+  end
+
+  private
+  def structured_field(field_name)
+    if field_name.nil?
+      ''
+    else
+      if field_name[0] == '[' && field_name[-1] == ']'
+        field_name
+      else
+        '[' + field_name + ']'
+      end
+    end
   end
 
   public
@@ -118,7 +136,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
   def handle(data, &block)
     event = LogStash::Event.new
-    event.set(raw_data_field, data) unless raw_data_field.nil?
+    event.set(@target_field + structured_field(raw_data_field), data) unless raw_data_field.nil?
 
     # Strip any quotations at the start and end, flex connectors seem to send this
     if data[0] == "\""
@@ -146,14 +164,14 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     message = split_data[HEADER_FIELDS.size..-1].join('|')
 
     # Try and parse out the syslog header if there is one
-    if event.get('cefVersion').include? ' '
-      split_cef_version= event.get('cefVersion').rpartition(' ')
-      event.set('syslog', split_cef_version[0])
-      event.set('cefVersion',split_cef_version[2])
+    if event.get(@target_field + structured_field('cefVersion')).include? ' '
+      split_cef_version= event.get(@target_field + structured_field('cefVersion')).rpartition(' ')
+      event.set(@target_field + structured_field('syslog'), split_cef_version[0])
+      event.set(@target_field + structured_field('cefVersion'), split_cef_version[2])
     end
 
     # Get rid of the CEF bit in the version
-    event.set('cefVersion', event.get('cefVersion').sub(/^CEF:/, ''))
+    event.set(@target_field + structured_field('cefVersion'), event.get(@target_field + structured_field('cefVersion')).sub(/^CEF:/, ''))
 
     # Strip any whitespace from the message
     if not message.nil? and message.include? '='
@@ -184,7 +202,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       message = message.map {|s| k, v = s.split('***'); "#{MAPPINGS[k] || k }=#{v}"}
       message = message.each_with_object({}) do |k|
         key, value = k.split(/\s*=\s*/,2)
-        event.set(key, value)
+        event.set(@target_field + structured_field(key), value)
       end
     end
 
@@ -318,14 +336,14 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     message = split_data[DEPRECATED_HEADER_FIELDS.size..-1].join('|')
 
     # Try and parse out the syslog header if there is one
-    if event.get('cef_version').include? ' '
-      split_cef_version= event.get('cef_version').rpartition(' ')
-      event.set('syslog', split_cef_version[0])
-      event.set('cef_version',split_cef_version[2])
+    if event.get(@target_field + structured_field('cef_version')).include? ' '
+      split_cef_version= event.get(@target_field + structured_field('cef_version')).rpartition(' ')
+      event.set(@target_field + structured_field('syslog'), split_cef_version[0])
+      event.set(@target_field + structured_field('cef_version'),split_cef_version[2])
     end
 
     # Get rid of the CEF bit in the version
-    event.set('cef_version', event.get('cef_version').sub(/^CEF:/, ''))
+    event.set(@target_field + structured_field('cef_version'), event.get(@target_field + structured_field('cef_version')).sub(/^CEF:/, ''))
 
     # Strip any whitespace from the message
     if not message.nil? and message.include? '='
@@ -343,7 +361,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       extensions[key] = value.gsub(/\\=/, '=').gsub(/\\\\/, '\\')
       Hash[*message].each{ |k, v| extensions[k] = v }
       # And save the new has as the extensions
-      event.set('cef_ext', extensions)
+      event.set(@target_field + structured_field('cef_ext'), extensions)
     end
 
   end
