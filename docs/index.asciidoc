@@ -22,7 +22,7 @@ include::{include_path}/plugin_header.asciidoc[]
 
 Implementation of a Logstash codec for the ArcSight Common Event Format (CEF)
 Based on Revision 20 of Implementing ArcSight CEF, dated from June 05, 2013
-https://protect724.hp.com/servlet/JiveServlet/downloadBody/1072-102-6-4697/CommonEventFormat.pdf
+https://community.saas.hpe.com/dcvta86296/attachments/dcvta86296/connector-documentation/1116/1/CommonEventFormatv23.pdf
 
 If this codec receives a payload from an input that is not a valid CEF message, then it will
 produce an event with the payload as the 'message' field and a '_cefparsefailure' tag.
