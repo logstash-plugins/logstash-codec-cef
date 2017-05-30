@@ -533,7 +533,7 @@ describe LogStash::Codecs::CEF do
       end
     end
 
-    let (:translate_abbreviated_cef_fields) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 proto=TCP shost=source.host.name dhost=destination.host.name spt=11024 dpt=9200 outcome=Success'}
+    let (:translate_abbreviated_cef_fields) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 proto=TCP shost=source.host.name dhost=destination.host.name spt=11024 dpt=9200 outcome=Success amac=00:80:48:1c:24:91'}
     it "should translate most known abbreviated CEF field names" do
       subject.decode(translate_abbreviated_cef_fields) do |e|
         validate(e)
@@ -545,6 +545,7 @@ describe LogStash::Codecs::CEF do
         insist { e.get("sourcePort") } == "11024"
         insist { e.get("destinationPort") } == "9200"
         insist { e.get("eventOutcome") } == "Success"
+        insist { e.get("agentMacAddress")} == "00:80:48:1c:24:91"
       end
     end
 
