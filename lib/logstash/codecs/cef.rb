@@ -32,15 +32,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # to help you build a new value from other parts of the event.
   config :name, :validate => :string, :default => "Logstash"
 
-  # Deprecated severity field for CEF header. The new value can include `%{foo}` strings
-  # to help you build a new value from other parts of the event.
-  #
-  # This field is used only if :severity is unchanged set to the default value.
-  #
-  # Defined as field of type string to allow sprintf. The value will be validated
-  # to be an integer in the range from 0 to 10 (including).
-  # All invalid values will be mapped to the default of 6.
-  config :sev, :validate => :string, :deprecated => "This setting is being deprecated, use :severity instead."
+  # Obsolete severity field for CEF header
+  config :sev, :validate => :string, :obsolete => "This setting is obsolete, use :severity instead."
 
   # Severity field in CEF header. The new value can include `%{foo}` strings
   # to help you build a new value from other parts of the event.
@@ -53,10 +46,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Fields to be included in CEV extension part as key/value pairs
   config :fields, :validate => :array, :default => []
 
-  # Set this flag if you want to have both v1 and v2 fields indexed at the same time. Note that this option will increase
-  # the index size and data stored in outputs like Elasticsearch
-  # This option is available to ease transition to new schema
-  config :deprecated_v1_fields, :validate => :boolean, :deprecated => "This setting is being deprecated"
+  config :deprecated_v1_fields, :validate => :boolean, :obsolete => "This setting is obsolete"
 
   # If your input puts a delimiter between each CEF event, you'll want to set
   # this to be that delimiter.
@@ -133,9 +123,6 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     split_data = data.split /(?<=[^\\]\\\\)[\|]|(?<!\\)[\|]/
 
     # To be invoked when config settings is set to TRUE for V1 field names (cef_ext.<fieldname>) the following code might be removed in upcoming Codec revision
-    if deprecated_v1_fields
-      handle_v1_fields(event, split_data)
-    end
 
     # To be invoked with default config settings to utilise the new field name formatting and flatten out the JSON document
     # Store header fields
@@ -213,12 +200,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     name = sanitize_header_field(event.sprintf(@name))
     name = self.class.get_config["name"][:default] if name == ""
 
-    # :sev is deprecated and therefore only considered if :severity equals the default setting or is invalid
     severity = sanitize_severity(event, @severity)
-    if severity == self.class.get_config["severity"][:default] && @sev
-      # Use deprecated setting sev
-      severity = sanitize_severity(event, @sev)
-    end
 
     # Should also probably set the fields sent
     header = ["CEF:0", vendor, product, version, signature, name, severity].join("|")
