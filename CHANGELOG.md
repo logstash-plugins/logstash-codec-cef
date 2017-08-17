@@ -1,3 +1,6 @@
+## 4.1.4
+  - Some documentation changes
+
 ## 4.1.2
  - added mapping for outcome = eventOutcome from CEF whitepaper (ref:p26/39)
 
