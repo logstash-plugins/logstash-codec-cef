@@ -171,8 +171,6 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       message = message.map {|s| k, v = s.split('***'); "#{MAPPINGS[k] || k }=#{v}"}
       message = message.each_with_object({}) do |k|
         key, value = k.split(/\s*=\s*/,2)
-        key = key.gsub("[", "_")
-        key = key.gsub("]", "_")
         event.set(key, value)
       end
     end
