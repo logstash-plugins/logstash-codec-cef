@@ -158,7 +158,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       # Appropriately tokenizing the additional fields when ArcSight connectors are sending events using "COMPLETE" mode processing.
       # If these fields are NOT needed, then set the ArcSight processing mode for this destination to "FASTER" or "FASTEST"
       # Refer to ArcSight's SmartConnector user configuration guide
-      message = message.gsub((/(\s+(\w+\.[^\s]\w+[^\|\s\.\=]+\=))/),'|^^^\2')
+      message = message.gsub((/(\s+(\w+\.[^\s]\w+[^\|\s\.\=]+(?<!\\)\=))/),'|^^^\2')
       message = message.split('|^^^')
 
       # Replaces the '=' with '***' to avoid conflict with strings with HTML content namely key-value pairs where the values contain HTML strings
@@ -171,6 +171,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       message = message.map {|s| k, v = s.split('***'); "#{MAPPINGS[k] || k }=#{v}"}
       message = message.each_with_object({}) do |k|
         key, value = k.split(/\s*=\s*/,2)
+        key = key.gsub("[", "_")
+        key = key.gsub("]", "_")
         event.set(key, value)
       end
     end
