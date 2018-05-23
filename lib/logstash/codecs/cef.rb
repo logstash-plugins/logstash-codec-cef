@@ -110,6 +110,12 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     event = LogStash::Event.new
     event.set(raw_data_field, data) unless raw_data_field.nil?
 
+    # According to the CEF White Paper ([cached][1]) that serves as the format's specification, valid CEF inputs MUST
+    # be encoded with UTF-8, so it is safe to assume that the given bytes are UTF-8.
+    #
+    # [1]: https://web.archive.org/web/20160422182529/https://kc.mcafee.com/resources/sites/MCAFEE/content/live/CORP_KNOWLEDGEBASE/78000/KB78712/en_US/CEF_White_Paper_20100722.pdf
+    safe_coerce_encoding(data, Encoding::UTF_8) || fail('invalid encoding; CEF inputs MUST be encoded with UTF-8')
+
     # Strip any quotations at the start and end, flex connectors seem to send this
     if data[0] == "\""
       data = data[1..-2]
@@ -179,6 +185,18 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   rescue => e
     @logger.error("Failed to decode CEF payload. Generating failure event with payload in message field.", :error => e.message, :backtrace => e.backtrace, :data => data)
     yield LogStash::Event.new("message" => data, "tags" => ["_cefparsefailure"])
+  end
+
+  # mutation-safe version of `String#force_encoding` that reverses itself if
+  # the result does not produce a string with valid encoding.
+  def safe_coerce_encoding(data, target_encoding)
+    original_encoding = data.encoding
+    data.force_encoding(target_encoding)
+
+    return true if data.valid_encoding?
+
+    data.force_encoding(original_encoding)
+    return false
   end
 
   public
