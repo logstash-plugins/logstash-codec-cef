@@ -1,5 +1,6 @@
 # encoding: utf-8
 require "logstash/util/buftok"
+require "logstash/util/charset"
 require "logstash/codecs/base"
 require "json"
 
@@ -80,6 +81,12 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   public
   def initialize(params={})
     super(params)
+
+    # CEF input MUST be UTF-8, per the CEF White Paper that serves as the format's specification:
+    # https://web.archive.org/web/20160422182529/https://kc.mcafee.com/resources/sites/MCAFEE/content/live/CORP_KNOWLEDGEBASE/78000/KB78712/en_US/CEF_White_Paper_20100722.pdf
+    @utf8_charset = LogStash::Util::Charset.new('UTF-8')
+    @utf8_charset.logger = self.logger
+
     if @delimiter
       # Logstash configuration doesn't have built-in support for escaping,
       # so we implement it here. Feature discussion for escaping is here:
@@ -109,6 +116,12 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   def handle(data, &block)
     event = LogStash::Event.new
     event.set(raw_data_field, data) unless raw_data_field.nil?
+
+    @utf8_charset.convert(data)
+
+    # Several of the many operations in the rest of this method will fail when they encounter UTF8-tagged strings
+    # that contain invalid byte sequences; fail early to avoid wasted work.
+    fail('invalid byte sequence in UTF-8') unless data.valid_encoding?
 
     # Strip any quotations at the start and end, flex connectors seem to send this
     if data[0] == "\""
