@@ -509,11 +509,44 @@ describe LogStash::Codecs::CEF do
       end
     end
 
+    context 'with UTF-8 message' do
+      let(:message) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=192.168.1.11 target=aaaaaああああaaaa msg=Description Omitted' }
+
+      # since this spec is encoded UTF-8, the literal strings it contains are encoded with UTF-8,
+      # but codecs in Logstash tend to receive their input as BINARY (or: ASCII-8BIT); ensure that
+      # we can handle either without losing the UTF-8 characters from the higher planes.
+      %w(
+        BINARY
+        UTF-8
+      ).each do |external_encoding|
+        context "externally encoded as #{external_encoding}" do
+          let(:message) { super().force_encoding(external_encoding) }
+          it 'should keep the higher-plane characters' do
+            subject.decode(message.dup) do |event|
+              validate(event)
+              insist { event.get("target") } == "aaaaaああああaaaa"
+              insist { event.get("target").encoding } == Encoding::UTF_8
+            end
+          end
+        end
+      end
+    end
+
+    context 'non-UTF-8 message' do
+      let(:message) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=192.168.1.11 target=aaaaaああああaaaa msg=Description Omitted'.encode('SHIFT_JIS') }
+      it 'should emit message unparsed with _cefparsefailure tag' do
+        subject.decode(message.dup) do |event|
+          insist { event.get("message").bytes.to_a } == message.bytes.to_a
+          insist { event.get("tags") } == ['_cefparsefailure']
+        end
+      end
+    end
+
     context "with raw_data_field set" do
       subject(:codec) { LogStash::Codecs::CEF.new("raw_data_field" => "message_raw") }
 
       it "should return the raw message in field message_raw" do
-        subject.decode(message) do |e|
+        subject.decode(message.dup) do |e|
           validate(e)
           insist { e.get("message_raw") } == message
         end
