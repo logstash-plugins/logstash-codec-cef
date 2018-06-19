@@ -1,3 +1,6 @@
+## 5.0.3
+ - Fix handling of higher-plane UTF-8 characters in message body
+
 ## 5.0.2
   - Update gemspec summary
 
