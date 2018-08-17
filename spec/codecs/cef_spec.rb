@@ -388,10 +388,26 @@ describe LogStash::Codecs::CEF do
       end
     end
 
+    # while we may see these in practice, equals MUST be escaped in the extensions per the spec.
     let (:equal_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this =has = equals\='}
     it "should be OK with equal in the message" do
       subject.decode(equal_in_message) do |e|
         insist { e.get("moo") } == 'this =has = equals='
+      end
+    end
+
+    context('escaped-equals and unescaped-spaces in the extension values') do
+      let(:query_string) { 'key1=value1&key2=value3 aa.bc&key3=value4'}
+      let(:escaped_query_string) { query_string.gsub('=','\\=') }
+      let(:cef_message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|go=start now query_string=#{escaped_query_string} final=done" }
+
+      it 'captures the extension values correctly' do
+        event = nil
+        subject.decode(cef_message) { |e| event = e }
+
+        expect(event.get('go')).to eq('start now')
+        expect(event.get('query_string')).to eq(query_string)
+        expect(event.get('final')).to eq('done')
       end
     end
 
@@ -475,7 +491,7 @@ describe LogStash::Codecs::CEF do
         insist { e.get("ad.field[0]") } == "field0"
         insist { e.get("ad.name[1]") } == "new_name"
         insist { e.get("ad.Authentification") } == "MICROSOFT_AUTHENTICATION_PACKAGE_V1_0"
-        insist { e.get("ad.Error_,Code") } == "3221225578"
+        insist { e.get('ad.Error_,Code') } == "3221225578"
         insist { e.get("additional.dotfieldName") } == "new_value"
       end
     end

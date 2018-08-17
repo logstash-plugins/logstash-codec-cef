@@ -177,6 +177,24 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Cache of a gsub pattern that matches a backslash-escaped backslash or backslash-escaped pipe, _capturing_ the escaped character
   HEADER_ESCAPE_CAPTURE = /\\([\\|])/
 
+  # Cache of a gsub pattern that matches a backslash-escaped backslash or backslash-escaped equals, _capturing_ the escaped character
+  EXTENSION_VALUE_ESCAPE_CAPTURE = /\\([\\=])/
+
+  # While the original CEF spec calls out that extension keys must be alphanumeric and not contain spaces,
+  # in practice many "CEF" producers like the Arcsight smart connector produce non-legal keys including underscores,
+  # commas, periods, and square-bracketed index offsets.
+  # Allow any sequence of characters that are _not_ backslashes, equals, or spaces.
+  EXTENSION_KEY_PATTERN = /[^= \\]+/
+
+  # In extensions, spaces may be included in an extension value without any escaping,
+  # so an extension value is a sequence of zero or more:
+  # - non-whitespace character; OR
+  # - runs of whitespace that are NOT followed by something that looks like a key-equals sequence
+  EXTENSION_VALUE_PATTERN = /(?:\S|\s++(?!#{EXTENSION_KEY_PATTERN}=))*/
+
+  # Cache of a scanner pattern that _captures_ extension field key/value pairs
+  EXTENSION_KEY_VALUE_SCANNER = /(#{EXTENSION_KEY_PATTERN})=(#{EXTENSION_VALUE_PATTERN})\s*/
+
   public
   def initialize(params={})
     super(params)
@@ -250,36 +268,18 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     # Get rid of the CEF bit in the version
     event.set('cefVersion', event.get('cefVersion').sub(/^CEF:/, ''))
 
-    # Strip any whitespace from the message
-    if not message.nil? and message.include? '='
+    # Use a scanning parser to capture the Extension Key/Value Pairs
+    if message && message.include?('=')
       message = message.strip
 
-      # If the last KVP has no value, add an empty string, this prevents hash errors below
-      if message.end_with?('=')
-        message = message + ' ' unless message.end_with?('\=')
-      end
+      message.scan(EXTENSION_KEY_VALUE_SCANNER) do |extension_field_key, raw_extension_field_value|
+        # expand abbreviated extension field keys
+        extension_field_key = MAPPINGS.fetch(extension_field_key, extension_field_key)
 
-      # Insert custom delimiter to separate key-value pairs, to which some values will contain special characters
-      # This separator '|^^^' os tested to be unique
-      message = message.gsub((/(?:(\s+(\w+\=)))/),'|^^^\2')
+        # process legal extension field value escapes
+        extension_field_value = raw_extension_field_value.gsub(EXTENSION_VALUE_ESCAPE_CAPTURE, '\1')
 
-      # Appropriately tokenizing the additional fields when ArcSight connectors are sending events using "COMPLETE" mode processing.
-      # If these fields are NOT needed, then set the ArcSight processing mode for this destination to "FASTER" or "FASTEST"
-      # Refer to ArcSight's SmartConnector user configuration guide
-      message = message.gsub((/(\s+(\w+\.[^\s]\w+[^\|\s\.\=]+\=))/),'|^^^\2')
-      message = message.split('|^^^')
-
-      # Replaces the '=' with '***' to avoid conflict with strings with HTML content namely key-value pairs where the values contain HTML strings
-      # Example : requestUrl = http://<testdomain>:<port>?query=A
-      for i in 0..message.length-1
-        message[i] = message[i].sub(/\=/, "***")
-        message[i] = message[i].gsub(/\\=/, '=').gsub(/\\\\/, '\\')
-      end
-
-      message = message.map {|s| k, v = s.split('***'); "#{MAPPINGS[k] || k }=#{v}"}
-      message = message.each_with_object({}) do |k|
-        key, value = k.split(/\s*=\s*/,2)
-        event.set(key, value)
+        event.set(extension_field_key, extension_field_value)
       end
     end
 
