@@ -322,6 +322,26 @@ describe LogStash::Codecs::CEF do
       end
     end
 
+    context 'when a CEF header ends with a pair of properly-escaped backslashes' do
+      let(:backslash) { '\\' }
+      let(:pipe) { '|' }
+      let(:message) { "CEF:0|security|threatmanager|1.0|100|double backslash" +
+                      backslash + backslash + # escaped backslash
+                      backslash + backslash + # escaped backslash
+                      "|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+
+      it 'should include the backslashes unescaped' do
+        event = nil
+
+        subject.decode(message) do |decoded_event|
+          event = decoded_event
+        end
+
+        expect(event.get('name')).to eq('double backslash' + backslash + backslash )
+        expect(event.get('severity')).to eq('10') # ensure we didn't consume the separator
+      end
+    end
+
     it "should parse the cef headers" do
       subject.decode(message) do |e|
         validate(e)

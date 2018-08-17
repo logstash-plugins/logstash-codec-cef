@@ -78,6 +78,18 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
   DEPRECATED_HEADER_FIELDS = ['cef_version','cef_vendor','cef_product','cef_device_version','cef_sigid','cef_name','cef_severity']
 
+  # A CEF Header is a sequence of zero or more:
+  #  - backslash-escaped pipes; OR
+  #  - backslash-escaped backslashes; OR
+  #  - non-pipe characters
+  HEADER_PATTERN = /(?:\\\||\\\\|[^|])*?/
+
+  # Cache of a scanner pattern that _captures_ a HEADER followed by an unescaped pipe
+  HEADER_SCANNER = /(#{HEADER_PATTERN})#{Regexp.quote('|')}/
+
+  # Cache of a gsub pattern that matches a backslash-escaped backslash or backslash-escaped pipe, _capturing_ the escaped character
+  HEADER_ESCAPE_CAPTURE = /\\([\\|])/
+
   public
   def initialize(params={})
     super(params)
@@ -128,22 +140,24 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       data = data[1..-2]
     end
 
-    # Split by the pipes, pipes in the extension part are perfectly valid and do not need escaping
-    # The better solution for the splitting regex would be /(?<!\\(\\\\)*)[\|]/, but this
-    # gives an "SyntaxError: (RegexpError) invalid pattern in look-behind" for the variable length look behind.
-    # Therefore one edge case is not handled properly: \\| (this should split, but it does not, because the escaped \ is not recognized)
-    # TODO: To solve all unescaping cases, regex is not suitable. A little parse should be written.
-    split_data = data.split /(?<=[^\\]\\\\)[\|]|(?<!\\)[\|]/
+    # Use a scanning parser to capture the HEADER_FIELDS
+    unprocessed_data = data
+    HEADER_FIELDS.each do |field_name|
+      match_data = HEADER_SCANNER.match(unprocessed_data)
+      break if match_data.nil? # missing fields
 
-    # To be invoked when config settings is set to TRUE for V1 field names (cef_ext.<fieldname>) the following code might be removed in upcoming Codec revision
+      escaped_field_value = match_data[1]
+      next if escaped_field_value.nil?
 
-    # To be invoked with default config settings to utilise the new field name formatting and flatten out the JSON document
-    # Store header fields
-    HEADER_FIELDS.each_with_index do |field_name, index|
-      store_header_field(event,field_name,split_data[index])
+      # process legal header escape sequences
+      unescaped_field_value = escaped_field_value.gsub(HEADER_ESCAPE_CAPTURE, '\1')
+
+      event.set(field_name, unescaped_field_value)
+      unprocessed_data = match_data.post_match
     end
+
     #Remainder is message
-    message = split_data[HEADER_FIELDS.size..-1].join('|')
+    message = unprocessed_data
 
     # Try and parse out the syslog header if there is one
     if event.get('cefVersion').include? ' '
