@@ -165,8 +165,6 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       "amac" => "agentMacAddress"
   }
 
-  DEPRECATED_HEADER_FIELDS = ['cef_version','cef_vendor','cef_product','cef_device_version','cef_sigid','cef_name','cef_severity']
-
   # A CEF Header is a sequence of zero or more:
   #  - backslash-escaped pipes; OR
   #  - backslash-escaped backslashes; OR
@@ -195,12 +193,6 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       @delimiter = @delimiter.gsub("\\r", "\r").gsub("\\n", "\n")
       @buffer = FileWatch::BufferedTokenizer.new(@delimiter)
     end
-  end
-
-  private
-  def store_header_field(event,field_name,field_data)
-    #Unescape pipes and backslash in header fields
-    event.set(field_name,field_data.gsub(/\\\|/, '|').gsub(/\\\\/, '\\')) unless field_data.nil?
   end
 
   public
@@ -406,44 +398,4 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   rescue TypeError, ArgumentError
     false
   end
-
-  def handle_v1_fields(event, split_data)
-    # Store header fields
-    DEPRECATED_HEADER_FIELDS.each_with_index do |field_name, index|
-      store_header_field(event,field_name,split_data[index])
-    end
-    #Remainder is message
-    message = split_data[DEPRECATED_HEADER_FIELDS.size..-1].join('|')
-
-    # Try and parse out the syslog header if there is one
-    if event.get('cef_version').include? ' '
-      split_cef_version= event.get('cef_version').rpartition(' ')
-      event.set('syslog', split_cef_version[0])
-      event.set('cef_version',split_cef_version[2])
-    end
-
-    # Get rid of the CEF bit in the version
-    event.set('cef_version', event.get('cef_version').sub(/^CEF:/, ''))
-
-    # Strip any whitespace from the message
-    if not message.nil? and message.include? '='
-      message = message.strip
-
-      # If the last KVP has no value, add an empty string, this prevents hash errors below
-      if message.end_with?('=')
-        message=message + ' ' unless message.end_with?('\=')
-      end
-
-      # Now parse the key value pairs into it
-      extensions = {}
-      message = message.split(/ ([\w\.]+)=/)
-      key, value = message.shift.split('=', 2)
-      extensions[key] = value.gsub(/\\=/, '=').gsub(/\\\\/, '\\')
-      Hash[*message].each{ |k, v| extensions[k] = v }
-      # And save the new has as the extensions
-      event.set('cef_ext', extensions)
-    end
-
-  end
-
 end
