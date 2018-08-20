@@ -522,8 +522,8 @@ describe LogStash::Codecs::CEF do
         validate(e)
         insist { e.get("sourceAddress") } == "10.0.0.192"
         insist { e.get("destinationAddress") } == "12.121.122.82"
-        insist { e.get("ad.field[0]") } == "field0"
-        insist { e.get("ad.name[1]") } == "new_name"
+        insist { e.get("[ad.field][0]") } == "field0"
+        insist { e.get("[ad.name][1]") } == "new_name"
         insist { e.get("ad.Authentification") } == "MICROSOFT_AUTHENTICATION_PACKAGE_V1_0"
         insist { e.get('ad.Error_,Code') } == "3221225578"
         insist { e.get("additional.dotfieldName") } == "new_value"
@@ -536,8 +536,8 @@ describe LogStash::Codecs::CEF do
         validate(e)
         insist { e.get("sourceAddress") } == "10.0.0.192"
         insist { e.get("destinationAddress") } == "12.121.122.82"
-        insist { e.get("ad.field[0]") } == "field0"
-        insist { e.get("ad.name[1]") } == "new_name"
+        insist { e.get("[ad.field][0]") } == "field0"
+        insist { e.get("[ad.name][1]") } == "new_name"
         insist { e.get("ad.Authentification") } == "MICROSOFT_AUTHENTICATION_PACKAGE_V1_0"
         insist { e.get("ad.Error_,Code") } == "3221225578"
         insist { e.get("additional.dotfieldName") } == "new_value"

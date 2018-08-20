@@ -186,6 +186,12 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Allow any sequence of characters that are _not_ backslashes, equals, or spaces.
   EXTENSION_KEY_PATTERN = /[^= \\]+/
 
+  # Some CEF extension keys seen in the wild use an undocumented array-like syntax that may not be compatible with
+  # the Event API's strict-mode FieldReference parser (e.g., `fieldname[0]`).
+  # Cache of a `String#sub` pattern matching array-like syntax and capturing both the base field name and the
+  # array-indexing portion so we can convert to a valid FieldReference (e.g., `[fieldname][0]`).
+  EXTENSION_KEY_ARRAY_CAPTURE = /^([^\[\]]+)((?:\[[0-9]+\])+)$/ # '[\1]\2'
+
   # In extensions, spaces may be included in an extension value without any escaping,
   # so an extension value is a sequence of zero or more:
   # - non-whitespace character; OR
@@ -275,6 +281,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       message.scan(EXTENSION_KEY_VALUE_SCANNER) do |extension_field_key, raw_extension_field_value|
         # expand abbreviated extension field keys
         extension_field_key = MAPPINGS.fetch(extension_field_key, extension_field_key)
+
+        # convert extension field name to strict legal field_reference, fixing field names with ambiguous array-like syntax
+        extension_field_key = extension_field_key.sub(EXTENSION_KEY_ARRAY_CAPTURE, '[\1]\2') if extension_field_key.end_with?(']')
 
         # process legal extension field value escapes
         extension_field_value = raw_extension_field_value.gsub(EXTENSION_VALUE_ESCAPE_CAPTURE, '\1')
