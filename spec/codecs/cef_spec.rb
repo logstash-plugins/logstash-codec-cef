@@ -296,6 +296,49 @@ describe LogStash::Codecs::CEF do
       insist { e.get('severity') } == "10"
     end
 
+    ##
+    # Use the given codec to decode the given data, ensuring exactly one event is emitted.
+    #
+    # If a block is given, yield the resulting event to the block _outside_ of `LogStash::Codecs::CEF#decode(String)`
+    # in order to avoid mismatched-exceptions raised by RSpec triggering the codec's exception-handling.
+    #
+    # @param codec [#decode]
+    # @param data [String]
+    # @yieldparam event [Event]
+    # @yieldreturn [void]
+    # @return [Event]
+    def decode_one(codec, data)
+      events = do_decode(codec, data)
+      fail("Expected one event, got #{events.size} events: #{events.inspect}") unless events.size == 1
+      event = events.first
+
+      yield event if block_given?
+
+      event
+    end
+
+    ##
+    # Use the given codec to decode the given data, returning an Array of the resulting Events
+    #
+    # If a block is given, each event is yielded to the block _outside_ of `LogStash::Codecs::CEF#decode(String)`
+    # in order to avoid mismatched-exceptions raised by RSpec triggering the codec's exception-handling.
+    #
+    # @param codec [#decode]
+    # @param data [String]
+    # @yieldparam event [Event]
+    # @yieldreturn [void]
+    # @return [Array<Event>]
+    def do_decode(codec, data)
+      events = []
+      codec.decode(data) do |event|
+        events << event
+      end
+
+      events.each { |event| yield event } if block_given?
+
+      events
+    end
+
     context "with delimiter set" do
       # '\r\n' in single quotes to simulate the real input from a config
       # containing \r\n as 4-character sequence in the config:
@@ -306,19 +349,15 @@ describe LogStash::Codecs::CEF do
       subject(:codec) { LogStash::Codecs::CEF.new("delimiter" => '\r\n') }
 
       it "should parse on the delimiter " do
-        subject.decode(message) do |e|
+        do_decode(subject,message) do |e|
           raise Exception.new("Should not get here. If we do, it means the decoder emitted an event before the delimiter was seen?")
         end
 
-        event = false;
-        subject.decode("\r\n") do |e|
+        decode_one(subject, "\r\n") do |e|
           validate(e)
           insist { e.get("deviceVendor") } == "security"
           insist { e.get("deviceProduct") } == "threatmanager"
-          event = true
         end
-
-        expect(event).to be_truthy
       end
     end
 
@@ -331,11 +370,7 @@ describe LogStash::Codecs::CEF do
                       "|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
 
       it 'should include the backslashes unescaped' do
-        event = nil
-
-        subject.decode(message) do |decoded_event|
-          event = decoded_event
-        end
+        event = decode_one(subject, message)
 
         expect(event.get('name')).to eq('double backslash' + backslash + backslash )
         expect(event.get('severity')).to eq('10') # ensure we didn't consume the separator
@@ -343,7 +378,7 @@ describe LogStash::Codecs::CEF do
     end
 
     it "should parse the cef headers" do
-      subject.decode(message) do |e|
+      decode_one(subject, message) do |e|
         validate(e)
         insist { e.get("deviceVendor") } == "security"
         insist { e.get("deviceProduct") } == "threatmanager"
@@ -351,7 +386,7 @@ describe LogStash::Codecs::CEF do
     end
 
     it "should parse the cef body" do
-      subject.decode(message) do |e|
+      decode_one(subject, message) do |e|
         insist { e.get("sourceAddress")} == "10.0.0.192"
         insist { e.get("destinationAddress") } == "12.121.122.82"
         insist { e.get("sourcePort") } == "1232"
@@ -360,7 +395,7 @@ describe LogStash::Codecs::CEF do
 
     let (:missing_headers) { "CEF:0|||1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
     it "should be OK with missing CEF headers (multiple pipes in sequence)" do
-      subject.decode(missing_headers) do |e|
+      decode_one(subject, missing_headers) do |e|
         validate(e)
         insist { e.get("deviceVendor") } == ""
         insist { e.get("deviceProduct") } == ""
@@ -369,21 +404,21 @@ describe LogStash::Codecs::CEF do
 
     let (:leading_whitespace) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10| src=10.0.0.192 dst=12.121.122.82 spt=1232" }
     it "should strip leading whitespace from the message" do
-      subject.decode(leading_whitespace) do |e|
+      decode_one(subject, leading_whitespace) do |e|
         validate(e)
       end
     end
 
     let (:escaped_pipes) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this\|has an escaped pipe' }
     it "should be OK with escaped pipes in the message" do
-      subject.decode(escaped_pipes) do |e|
+      decode_one(subject, escaped_pipes) do |e|
         insist { e.get("moo") } == 'this\|has an escaped pipe'
       end
     end
 
     let (:pipes_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this|has an pipe'}
     it "should be OK with not escaped pipes in the message" do
-      subject.decode(pipes_in_message) do |e|
+      decode_one(subject, pipes_in_message) do |e|
         insist { e.get("moo") } == 'this|has an pipe'
       end
     end
@@ -391,7 +426,7 @@ describe LogStash::Codecs::CEF do
     # while we may see these in practice, equals MUST be escaped in the extensions per the spec.
     let (:equal_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this =has = equals\='}
     it "should be OK with equal in the message" do
-      subject.decode(equal_in_message) do |e|
+      decode_one(subject, equal_in_message) do |e|
         insist { e.get("moo") } == 'this =has = equals='
       end
     end
@@ -402,8 +437,7 @@ describe LogStash::Codecs::CEF do
       let(:cef_message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|go=start now query_string=#{escaped_query_string} final=done" }
 
       it 'captures the extension values correctly' do
-        event = nil
-        subject.decode(cef_message) { |e| event = e }
+        event = decode_one(subject, cef_message)
 
         expect(event.get('go')).to eq('start now')
         expect(event.get('query_string')).to eq(query_string)
@@ -413,7 +447,7 @@ describe LogStash::Codecs::CEF do
 
     let (:escaped_backslash_in_header) {'CEF:0|secu\\\\rity|threat\\\\manager|1.\\\\0|10\\\\0|tro\\\\jan successfully stopped|\\\\10|'}
     it "should be OK with escaped backslash in the headers" do
-      subject.decode(escaped_backslash_in_header) do |e|
+      decode_one(subject, escaped_backslash_in_header) do |e|
         insist { e.get("cefVersion") } == '0'
         insist { e.get("deviceVendor") } == 'secu\\rity'
         insist { e.get("deviceProduct") } == 'threat\\manager'
@@ -426,7 +460,7 @@ describe LogStash::Codecs::CEF do
 
     let (:escaped_backslash_in_header_edge_case) {'CEF:0|security\\\\\\||threatmanager\\\\|1.0|100|trojan successfully stopped|10|'}
     it "should be OK with escaped backslash in the headers (edge case: escaped slash in front of pipe)" do
-      subject.decode(escaped_backslash_in_header_edge_case) do |e|
+      decode_one(subject, escaped_backslash_in_header_edge_case) do |e|
         validate(e)
         insist { e.get("deviceVendor") } == 'security\\|'
         insist { e.get("deviceProduct") } == 'threatmanager\\'
@@ -435,7 +469,7 @@ describe LogStash::Codecs::CEF do
 
     let (:escaped_pipes_in_header) {'CEF:0|secu\\|rity|threatmanager\\||1.\\|0|10\\|0|tro\\|jan successfully stopped|\\|10|'}
     it "should be OK with escaped pipes in the headers" do
-      subject.decode(escaped_pipes_in_header) do |e|
+      decode_one(subject, escaped_pipes_in_header) do |e|
         insist { e.get("cefVersion") } == '0'
         insist { e.get("deviceVendor") } == 'secu|rity'
         insist { e.get("deviceProduct") } == 'threatmanager|'
@@ -448,14 +482,14 @@ describe LogStash::Codecs::CEF do
 
     let (:backslash_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this \\has \\ backslashs\\'}
     it "should be OK with backslashs in the message" do
-      subject.decode(backslash_in_message) do |e|
+      decode_one(subject, backslash_in_message) do |e|
         insist { e.get("moo") } == 'this \\has \\ backslashs\\'
       end
     end
 
     let (:equal_in_header) {'CEF:0|security|threatmanager=equal|1.0|100|trojan successfully stopped|10|'}
     it "should be OK with equal in the headers" do
-      subject.decode(equal_in_header) do |e|
+      decode_one(subject, equal_in_header) do |e|
         validate(e)
         insist { e.get("deviceProduct") } == "threatmanager=equal"
       end
@@ -463,7 +497,7 @@ describe LogStash::Codecs::CEF do
 
     let (:spaces_in_between_keys) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10| src=10.0.0.192  dst=12.121.122.82  spt=1232'}
     it "should be OK to have one or more spaces between keys" do
-      subject.decode(spaces_in_between_keys) do |e|
+      decode_one(subject, spaces_in_between_keys) do |e|
         validate(e)
         insist { e.get("sourceAddress") } == "10.0.0.192"
         insist { e.get("destinationAddress") } == "12.121.122.82"
@@ -473,7 +507,7 @@ describe LogStash::Codecs::CEF do
 
     let (:allow_spaces_in_values) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82  spt=1232 dproc=InternetExplorer x.x.x.x'}
     it "should be OK to have one or more spaces in values" do
-      subject.decode(allow_spaces_in_values) do |e|
+      decode_one(subject, allow_spaces_in_values) do |e|
         validate(e)
         insist { e.get("sourceAddress") } == "10.0.0.192"
         insist { e.get("destinationAddress") } == "12.121.122.82"
@@ -484,7 +518,7 @@ describe LogStash::Codecs::CEF do
 
     let (:preserve_additional_fields_with_dot_notations) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 additional.dotfieldName=new_value ad.Authentification=MICROSOFT_AUTHENTICATION_PACKAGE_V1_0 ad.Error_,Code=3221225578 dst=12.121.122.82 ad.field[0]=field0 ad.name[1]=new_name'}
     it "should keep ad.fields" do
-      subject.decode(preserve_additional_fields_with_dot_notations) do |e|
+      decode_one(subject, preserve_additional_fields_with_dot_notations) do |e|
         validate(e)
         insist { e.get("sourceAddress") } == "10.0.0.192"
         insist { e.get("destinationAddress") } == "12.121.122.82"
@@ -498,7 +532,7 @@ describe LogStash::Codecs::CEF do
 
     let (:preserve_random_values_key_value_pairs_alongside_with_additional_fields) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 cs4=401 random.user Admin 0 23041A10181C0000  23041810181C0000  /CN\=random.user/OU\=User Login End-Entity  /CN\=TEST/OU\=Login CA TEST 34 additional.dotfieldName=new_value ad.Authentification=MICROSOFT_AUTHENTICATION_PACKAGE_V1_0 ad.Error_,Code=3221225578 dst=12.121.122.82 ad.field[0]=field0 ad.name[1]=new_name'}
     it "should correctly parse random values even with additional fields in message" do
-      subject.decode(preserve_random_values_key_value_pairs_alongside_with_additional_fields) do |e|
+      decode_one(subject, preserve_random_values_key_value_pairs_alongside_with_additional_fields) do |e|
         validate(e)
         insist { e.get("sourceAddress") } == "10.0.0.192"
         insist { e.get("destinationAddress") } == "12.121.122.82"
@@ -513,7 +547,7 @@ describe LogStash::Codecs::CEF do
 
     let (:preserve_unmatched_key_mappings) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 new_key_by_device=new_values here'}
     it "should preserve unmatched key mappings" do
-      subject.decode(preserve_unmatched_key_mappings) do |e|
+      decode_one(subject, preserve_unmatched_key_mappings) do |e|
         validate(e)
         insist { e.get("sourceAddress") } == "10.0.0.192"
         insist { e.get("destinationAddress") } == "12.121.122.82"
@@ -523,7 +557,7 @@ describe LogStash::Codecs::CEF do
 
     let (:translate_abbreviated_cef_fields) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 proto=TCP shost=source.host.name dhost=destination.host.name spt=11024 dpt=9200 outcome=Success amac=00:80:48:1c:24:91'}
     it "should translate most known abbreviated CEF field names" do
-      subject.decode(translate_abbreviated_cef_fields) do |e|
+      decode_one(subject, translate_abbreviated_cef_fields) do |e|
         validate(e)
         insist { e.get("sourceAddress") } == "10.0.0.192"
         insist { e.get("destinationAddress") } == "12.121.122.82"
@@ -539,7 +573,7 @@ describe LogStash::Codecs::CEF do
 
     let (:syslog) { "Syslogdate Sysloghost CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
     it "Should detect headers before CEF starts" do
-      subject.decode(syslog) do |e|
+      decode_one(subject, syslog) do |e|
         validate(e)
         insist { e.get('syslog') } == 'Syslogdate Sysloghost'
       end
@@ -558,7 +592,7 @@ describe LogStash::Codecs::CEF do
         context "externally encoded as #{external_encoding}" do
           let(:message) { super().force_encoding(external_encoding) }
           it 'should keep the higher-plane characters' do
-            subject.decode(message.dup) do |event|
+            decode_one(subject, message.dup) do |event|
               validate(event)
               insist { event.get("target") } == "aaaaaああああaaaa"
               insist { event.get("target").encoding } == Encoding::UTF_8
@@ -571,7 +605,7 @@ describe LogStash::Codecs::CEF do
     context 'non-UTF-8 message' do
       let(:message) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=192.168.1.11 target=aaaaaああああaaaa msg=Description Omitted'.encode('SHIFT_JIS') }
       it 'should emit message unparsed with _cefparsefailure tag' do
-        subject.decode(message.dup) do |event|
+        decode_one(subject, message.dup) do |event|
           insist { event.get("message").bytes.to_a } == message.bytes.to_a
           insist { event.get("tags") } == ['_cefparsefailure']
         end
@@ -582,7 +616,7 @@ describe LogStash::Codecs::CEF do
       subject(:codec) { LogStash::Codecs::CEF.new("raw_data_field" => "message_raw") }
 
       it "should return the raw message in field message_raw" do
-        subject.decode(message.dup) do |e|
+        decode_one(subject, message.dup) do |e|
           validate(e)
           insist { e.get("message_raw") } == message
         end
