@@ -180,11 +180,18 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Cache of a gsub pattern that matches a backslash-escaped backslash or backslash-escaped equals, _capturing_ the escaped character
   EXTENSION_VALUE_ESCAPE_CAPTURE = /\\([\\=])/
 
-  # While the original CEF spec calls out that extension keys must be alphanumeric and not contain spaces,
+  # While the original CEF spec calls out that extension keys must be alphanumeric and must not contain spaces,
   # in practice many "CEF" producers like the Arcsight smart connector produce non-legal keys including underscores,
   # commas, periods, and square-bracketed index offsets.
-  # Allow any sequence of characters that are _not_ backslashes, equals, or spaces.
-  EXTENSION_KEY_PATTERN = /[^= \\]+/
+  #
+  # To support this, we look for a specific sequence of characters that are followed by an equals sign. This pattern
+  # will correctly identify all strictly-legal keys, and will also match those that include a dot "subkey"
+  #
+  # That sequence must begin with one or more `\w` (word: alphanumeric + underscore), which _optionally_ may be followed
+  # by "subkey" sequence consisting of a literal dot (`.`) followed by a non-whitespace character, and one or more word
+  # characters, and one or more characters that do not convey semantic meaning within CEF (e.g., literal-pipe (`|`),
+  # whitespace (`\s`), literal-dot (`.`), literal-equals (`=`), or literal-backslash ('\')).
+  EXTENSION_KEY_PATTERN = /(?:\w+(?:\.[^\s]\w+[^\|\s\.\=\\]+)?(?==))/
 
   # Some CEF extension keys seen in the wild use an undocumented array-like syntax that may not be compatible with
   # the Event API's strict-mode FieldReference parser (e.g., `fieldname[0]`).

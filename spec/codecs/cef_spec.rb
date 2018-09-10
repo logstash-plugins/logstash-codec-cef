@@ -431,6 +431,35 @@ describe LogStash::Codecs::CEF do
       end
     end
 
+    let(:malformed_unescaped_equals_in_extension_value) { %q{CEF:0|FooBar|Web Gateway|1.2.3.45.67|200|Success|2|rt=Sep 07 2018 14:50:39 cat=Access Log dst=1.1.1.1 dhost=foo.example.com suser=redacted src=2.2.2.2 requestMethod=POST request='https://foo.example.com/bar/bingo/1' requestClientApplication='Foo-Bar/2018.1.7; Email:user@example.com; Guid:test=' cs1= cs1Label=Foo Bar} }
+    it 'should split correctly' do
+      decode_one(subject, malformed_unescaped_equals_in_extension_value) do |event|
+        expect(event.get('cefVersion')).to eq('0')
+        expect(event.get('deviceVendor')).to eq('FooBar')
+        expect(event.get('deviceProduct')).to eq('Web Gateway')
+        expect(event.get('deviceVersion')).to eq('1.2.3.45.67')
+        expect(event.get('deviceEventClassId')).to eq('200')
+        expect(event.get('name')).to eq('Success')
+        expect(event.get('severity')).to eq('2')
+
+        # extension key/value pairs
+        expect(event.get('deviceReceiptTime')).to eq('Sep 07 2018 14:50:39')
+        expect(event.get('deviceEventCategory')).to eq('Access Log')
+        expect(event.get('deviceVersion')).to eq('1.2.3.45.67')
+        expect(event.get('destinationAddress')).to eq('1.1.1.1')
+        expect(event.get('destinationHostName')).to eq('foo.example.com')
+        expect(event.get('sourceUserName')).to eq('redacted')
+        expect(event.get('sourceAddress')).to eq('2.2.2.2')
+        expect(event.get('requestMethod')).to eq('POST')
+        expect(event.get('requestUrl')).to eq(%q{'https://foo.example.com/bar/bingo/1'})
+        # Although the value for `requestClientApplication` contains an illegal unquoted equals sign, the sequence
+        # preceeding it isn't shaped like a key, so we allow it to be a part of the value.
+        expect(event.get('requestClientApplication')).to eq(%q{'Foo-Bar/2018.1.7; Email:user@example.com; Guid:test='})
+        expect(event.get('deviceCustomString1Label')).to eq('Foo Bar')
+        expect(event.get('deviceCustomString1')).to eq('')
+      end
+    end
+
     context('escaped-equals and unescaped-spaces in the extension values') do
       let(:query_string) { 'key1=value1&key2=value3 aa.bc&key3=value4'}
       let(:escaped_query_string) { query_string.gsub('=','\\=') }
