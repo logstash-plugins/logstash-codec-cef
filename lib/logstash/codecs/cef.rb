@@ -188,8 +188,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # will correctly identify all strictly-legal keys, and will also match those that include a dot "subkey"
   #
   # That sequence must begin with one or more `\w` (word: alphanumeric + underscore), which _optionally_ may be followed
-  # by "subkey" sequence consisting of a literal dot (`.`) followed by a non-whitespace character, and one or more word
-  # characters, and one or more characters that do not convey semantic meaning within CEF (e.g., literal-pipe (`|`),
+  # by "subkey" sequence consisting of a literal dot (`.`) followed by a non-whitespace character, then one or more word
+  # characters, and then one or more characters that do not convey semantic meaning within CEF (e.g., literal-pipe (`|`),
   # whitespace (`\s`), literal-dot (`.`), literal-equals (`=`), or literal-backslash ('\')).
   EXTENSION_KEY_PATTERN = /(?:\w+(?:\.[^\s]\w+[^\|\s\.\=\\]+)?(?==))/
 

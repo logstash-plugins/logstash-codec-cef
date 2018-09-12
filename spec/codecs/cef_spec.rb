@@ -453,7 +453,7 @@ describe LogStash::Codecs::CEF do
         expect(event.get('requestMethod')).to eq('POST')
         expect(event.get('requestUrl')).to eq(%q{'https://foo.example.com/bar/bingo/1'})
         # Although the value for `requestClientApplication` contains an illegal unquoted equals sign, the sequence
-        # preceeding it isn't shaped like a key, so we allow it to be a part of the value.
+        # preceeding the unescaped-equals isn't shaped like a key, so we allow it to be a part of the value.
         expect(event.get('requestClientApplication')).to eq(%q{'Foo-Bar/2018.1.7; Email:user@example.com; Guid:test='})
         expect(event.get('deviceCustomString1Label')).to eq('Foo Bar')
         expect(event.get('deviceCustomString1')).to eq('')

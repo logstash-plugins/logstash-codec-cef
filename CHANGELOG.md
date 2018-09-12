@@ -1,3 +1,6 @@
+## 5.0.5
+ - Fix handling of malformed inputs that have illegal unescaped-equals characters in extension field values (restores behaviour from <= v5.0.3 in some edge-cases) ([#56](https://github.com/logstash-plugins/logstash-codec-cef/issues/56))
+
 ## 5.0.4
  - Fix bug in parsing headers where certain legal escape sequences could cause non-escaped pipe characters to be ignored.
  - Fix bug in parsing extension values where a legal unescaped space in a field's value could be interpreted as a field separator (#54)

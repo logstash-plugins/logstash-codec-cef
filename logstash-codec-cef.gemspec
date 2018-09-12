@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
 
   s.name            = 'logstash-codec-cef'
-  s.version         = '5.0.4'
+  s.version         = '5.0.5'
   s.platform        = 'java'
   s.licenses        = ['Apache License (2.0)']
   s.summary         = "Reads the ArcSight Common Event Format (CEF)."
