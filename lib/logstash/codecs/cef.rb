@@ -46,6 +46,12 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
   # Fields to be included in CEV extension part as key/value pairs
   config :fields, :validate => :array, :default => []
+  
+  # When encoding to CEF, set this to true to adhere to the specifications and
+  # encode using the CEF key name (short name) for the CEF field names.
+  # Defaults to false to preserve previous behaviour that was to use the long
+  # version of the CEF field names.
+  config :reverse_mapping, :validate => :boolean, :default => false
 
   config :deprecated_v1_fields, :validate => :boolean, :obsolete => "This setting is obsolete"
 
@@ -394,7 +400,10 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     return nil if val.nil?
 
     key = sanitize_extension_key(fieldname)
-    key = REVERSE_MAPPINGS[key] || key
+    
+    if @reverse_mapping
+      key = REVERSE_MAPPINGS[key] || key
+    end
     
     case val
     when Array, Hash
