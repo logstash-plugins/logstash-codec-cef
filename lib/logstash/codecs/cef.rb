@@ -1,5 +1,6 @@
 # encoding: utf-8
 require "logstash/util/buftok"
+require "logstash/util/charset"
 require "logstash/codecs/base"
 require "json"
 
@@ -73,16 +74,152 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   HEADER_FIELDS = ['cefVersion','deviceVendor','deviceProduct','deviceVersion','deviceEventClassId','name','severity']
 
   # Translating and flattening the CEF extensions with known field names as documented in the Common Event Format whitepaper
-  MAPPINGS = { "act" => "deviceAction", "app" => "applicationProtocol", "c6a1" => "deviceCustomIPv6Address1", "c6a1Label" => "deviceCustomIPv6Address1Label", "c6a2" => "deviceCustomIPv6Address2", "c6a2Label" => "deviceCustomIPv6Address2Label", "c6a3" => "deviceCustomIPv6Address3", "c6a3Label" => "deviceCustomIPv6Address3Label", "c6a4" => "deviceCustomIPv6Address4", "c6a4Label" => "deviceCustomIPv6Address4Label", "cat" => "deviceEventCategory", "cfp1" => "deviceCustomFloatingPoint1", "cfp1Label" => "deviceCustomFloatingPoint1Label", "cfp2" => "deviceCustomFloatingPoint2", "cfp2Label" => "deviceCustomFloatingPoint2Label", "cfp3" => "deviceCustomFloatingPoint3", "cfp3Label" => "deviceCustomFloatingPoint3Label", "cfp4" => "deviceCustomFloatingPoint4", "cfp4Label" => "deviceCustomFloatingPoint4Label", "cn1" => "deviceCustomNumber1", "cn1Label" => "deviceCustomNumber1Label", "cn2" => "deviceCustomNumber2", "cn2Label" => "deviceCustomNumber2Label", "cn3" => "deviceCustomNumber3", "cn3Label" => "deviceCustomNumber3Label", "cnt" => "baseEventCount", "cs1" => "deviceCustomString1", "cs1Label" => "deviceCustomString1Label", "cs2" => "deviceCustomString2", "cs2Label" => "deviceCustomString2Label", "cs3" => "deviceCustomString3", "cs3Label" => "deviceCustomString3Label", "cs4" => "deviceCustomString4", "cs4Label" => "deviceCustomString4Label", "cs5" => "deviceCustomString5", "cs5Label" => "deviceCustomString5Label", "cs6" => "deviceCustomString6", "cs6Label" => "deviceCustomString6Label", "dhost" => "destinationHostName", "dmac" => "destinationMacAddress", "dntdom" => "destinationNtDomain", "dpid" => "destinationProcessId", "dpriv" => "destinationUserPrivileges", "dproc" => "destinationProcessName", "dpt" => "destinationPort", "dst" => "destinationAddress", "duid" => "destinationUserId", "duser" => "destinationUserName", "dvc" => "deviceAddress", "dvchost" => "deviceHostName", "dvcmac" => "deviceMacAddress", "dvcpid" => "deviceProcessId", "end" => "endTime", "fname" => "fileName", "fsize" => "fileSize", "in" => "bytesIn", "msg" => "message", "out" => "bytesOut", "outcome" => "eventOutcome", "proto" => "transportProtocol", "request" => "requestUrl", "rt" => "deviceReceiptTime", "shost" => "sourceHostName", "smac" => "sourceMacAddress", "sntdom" => "sourceNtDomain", "spid" => "sourceProcessId", "spriv" => "sourceUserPrivileges", "sproc" => "sourceProcessName", "spt" => "sourcePort", "src" => "sourceAddress", "start" => "startTime", "suid" => "sourceUserId", "suser" => "sourceUserName", "ahost" => "agentHost", "art" => "agentReceiptTime", "at" => "agentType", "aid" => "agentId", "_cefVer" => "cefVersion", "agt" => "agentAddress", "av" => "agentVersion", "atz" => "agentTimeZone", "dtz" => "destinationTimeZone", "slong" => "sourceLongitude", "slat" => "sourceLatitude", "dlong" => "destinationLongitude", "dlat" => "destinationLatitude", "catdt" => "categoryDeviceType", "mrt" => "managerReceiptTime", "amac" => "agentMacAddress" }
+  MAPPINGS = {
+      "act" => "deviceAction",
+      "app" => "applicationProtocol",
+      "c6a1" => "deviceCustomIPv6Address1",
+      "c6a1Label" => "deviceCustomIPv6Address1Label",
+      "c6a2" => "deviceCustomIPv6Address2",
+      "c6a2Label" => "deviceCustomIPv6Address2Label",
+      "c6a3" => "deviceCustomIPv6Address3",
+      "c6a3Label" => "deviceCustomIPv6Address3Label",
+      "c6a4" => "deviceCustomIPv6Address4",
+      "c6a4Label" => "deviceCustomIPv6Address4Label",
+      "cat" => "deviceEventCategory",
+      "cfp1" => "deviceCustomFloatingPoint1",
+      "cfp1Label" => "deviceCustomFloatingPoint1Label",
+      "cfp2" => "deviceCustomFloatingPoint2",
+      "cfp2Label" => "deviceCustomFloatingPoint2Label",
+      "cfp3" => "deviceCustomFloatingPoint3",
+      "cfp3Label" => "deviceCustomFloatingPoint3Label",
+      "cfp4" => "deviceCustomFloatingPoint4",
+      "cfp4Label" => "deviceCustomFloatingPoint4Label",
+      "cn1" => "deviceCustomNumber1",
+      "cn1Label" => "deviceCustomNumber1Label",
+      "cn2" => "deviceCustomNumber2",
+      "cn2Label" => "deviceCustomNumber2Label",
+      "cn3" => "deviceCustomNumber3",
+      "cn3Label" => "deviceCustomNumber3Label",
+      "cnt" => "baseEventCount",
+      "cs1" => "deviceCustomString1",
+      "cs1Label" => "deviceCustomString1Label",
+      "cs2" => "deviceCustomString2",
+      "cs2Label" => "deviceCustomString2Label",
+      "cs3" => "deviceCustomString3",
+      "cs3Label" => "deviceCustomString3Label",
+      "cs4" => "deviceCustomString4",
+      "cs4Label" => "deviceCustomString4Label",
+      "cs5" => "deviceCustomString5",
+      "cs5Label" => "deviceCustomString5Label",
+      "cs6" => "deviceCustomString6",
+      "cs6Label" => "deviceCustomString6Label",
+      "dhost" => "destinationHostName",
+      "dmac" => "destinationMacAddress",
+      "dntdom" => "destinationNtDomain",
+      "dpid" => "destinationProcessId",
+      "dpriv" => "destinationUserPrivileges",
+      "dproc" => "destinationProcessName",
+      "dpt" => "destinationPort",
+      "dst" => "destinationAddress",
+      "duid" => "destinationUserId",
+      "duser" => "destinationUserName",
+      "dvc" => "deviceAddress",
+      "dvchost" => "deviceHostName",
+      "dvcpid" => "deviceProcessId",
+      "end" => "endTime",
+      "fname" => "fileName",
+      "fsize" => "fileSize",
+      "in" => "bytesIn",
+      "msg" => "message",
+      "out" => "bytesOut",
+      "outcome" => "eventOutcome",
+      "proto" => "transportProtocol",
+      "request" => "requestUrl",
+      "rt" => "deviceReceiptTime",
+      "shost" => "sourceHostName",
+      "smac" => "sourceMacAddress",
+      "sntdom" => "sourceNtDomain",
+      "spid" => "sourceProcessId",
+      "spriv" => "sourceUserPrivileges",
+      "sproc" => "sourceProcessName",
+      "spt" => "sourcePort",
+      "src" => "sourceAddress",
+      "start" => "startTime",
+      "suid" => "sourceUserId",
+      "suser" => "sourceUserName",
+      "ahost" => "agentHost",
+      "art" => "agentReceiptTime",
+      "at" => "agentType",
+      "aid" => "agentId",
+      "_cefVer" => "cefVersion",
+      "agt" => "agentAddress",
+      "av" => "agentVersion",
+      "atz" => "agentTimeZone",
+      "dtz" => "destinationTimeZone",
+      "slong" => "sourceLongitude",
+      "slat" => "sourceLatitude",
+      "dlong" => "destinationLongitude",
+      "dlat" => "destinationLatitude",
+      "catdt" => "categoryDeviceType",
+      "mrt" => "managerReceiptTime",
+      "amac" => "agentMacAddress"
+  }
 
   # Reverse mapping of CEF full field names to CEF extensions field names for encoding into a CEF event for output.
   REVERSE_MAPPINGS = MAPPINGS.invert
 
-  DEPRECATED_HEADER_FIELDS = ['cef_version','cef_vendor','cef_product','cef_device_version','cef_sigid','cef_name','cef_severity']
+  # A CEF Header is a sequence of zero or more:
+  #  - backslash-escaped pipes; OR
+  #  - backslash-escaped backslashes; OR
+  #  - non-pipe characters
+  HEADER_PATTERN = /(?:\\\||\\\\|[^|])*?/
+
+  # Cache of a scanner pattern that _captures_ a HEADER followed by an unescaped pipe
+  HEADER_SCANNER = /(#{HEADER_PATTERN})#{Regexp.quote('|')}/
+
+  # Cache of a gsub pattern that matches a backslash-escaped backslash or backslash-escaped pipe, _capturing_ the escaped character
+  HEADER_ESCAPE_CAPTURE = /\\([\\|])/
+
+  # Cache of a gsub pattern that matches a backslash-escaped backslash or backslash-escaped equals, _capturing_ the escaped character
+  EXTENSION_VALUE_ESCAPE_CAPTURE = /\\([\\=])/
+
+  # While the original CEF spec calls out that extension keys must be alphanumeric and must not contain spaces,
+  # in practice many "CEF" producers like the Arcsight smart connector produce non-legal keys including underscores,
+  # commas, periods, and square-bracketed index offsets.
+  #
+  # To support this, we look for a specific sequence of characters that are followed by an equals sign. This pattern
+  # will correctly identify all strictly-legal keys, and will also match those that include a dot "subkey"
+  #
+  # That sequence must begin with one or more `\w` (word: alphanumeric + underscore), which _optionally_ may be followed
+  # by "subkey" sequence consisting of a literal dot (`.`) followed by a non-whitespace character, then one or more word
+  # characters, and then one or more characters that do not convey semantic meaning within CEF (e.g., literal-pipe (`|`),
+  # whitespace (`\s`), literal-dot (`.`), literal-equals (`=`), or literal-backslash ('\')).
+  EXTENSION_KEY_PATTERN = /(?:\w+(?:\.[^\s]\w+[^\|\s\.\=\\]+)?(?==))/
+
+  # Some CEF extension keys seen in the wild use an undocumented array-like syntax that may not be compatible with
+  # the Event API's strict-mode FieldReference parser (e.g., `fieldname[0]`).
+  # Cache of a `String#sub` pattern matching array-like syntax and capturing both the base field name and the
+  # array-indexing portion so we can convert to a valid FieldReference (e.g., `[fieldname][0]`).
+  EXTENSION_KEY_ARRAY_CAPTURE = /^([^\[\]]+)((?:\[[0-9]+\])+)$/ # '[\1]\2'
+
+  # In extensions, spaces may be included in an extension value without any escaping,
+  # so an extension value is a sequence of zero or more:
+  # - non-whitespace character; OR
+  # - runs of whitespace that are NOT followed by something that looks like a key-equals sequence
+  EXTENSION_VALUE_PATTERN = /(?:\S|\s++(?!#{EXTENSION_KEY_PATTERN}=))*/
+
+  # Cache of a scanner pattern that _captures_ extension field key/value pairs
+  EXTENSION_KEY_VALUE_SCANNER = /(#{EXTENSION_KEY_PATTERN})=(#{EXTENSION_VALUE_PATTERN})\s*/
 
   public
   def initialize(params={})
     super(params)
+
+    # CEF input MUST be UTF-8, per the CEF White Paper that serves as the format's specification:
+    # https://web.archive.org/web/20160422182529/https://kc.mcafee.com/resources/sites/MCAFEE/content/live/CORP_KNOWLEDGEBASE/78000/KB78712/en_US/CEF_White_Paper_20100722.pdf
+    @utf8_charset = LogStash::Util::Charset.new('UTF-8')
+    @utf8_charset.logger = self.logger
+
     if @delimiter
       # Logstash configuration doesn't have built-in support for escaping,
       # so we implement it here. Feature discussion for escaping is here:
@@ -90,12 +227,6 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       @delimiter = @delimiter.gsub("\\r", "\r").gsub("\\n", "\n")
       @buffer = FileWatch::BufferedTokenizer.new(@delimiter)
     end
-  end
-
-  private
-  def store_header_field(event,field_name,field_data)
-    #Unescape pipes and backslash in header fields
-    event.set(field_name,field_data.gsub(/\\\|/, '|').gsub(/\\\\/, '\\')) unless field_data.nil?
   end
 
   public
@@ -113,27 +244,35 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     event = LogStash::Event.new
     event.set(raw_data_field, data) unless raw_data_field.nil?
 
+    @utf8_charset.convert(data)
+
+    # Several of the many operations in the rest of this method will fail when they encounter UTF8-tagged strings
+    # that contain invalid byte sequences; fail early to avoid wasted work.
+    fail('invalid byte sequence in UTF-8') unless data.valid_encoding?
+
     # Strip any quotations at the start and end, flex connectors seem to send this
     if data[0] == "\""
       data = data[1..-2]
     end
 
-    # Split by the pipes, pipes in the extension part are perfectly valid and do not need escaping
-    # The better solution for the splitting regex would be /(?<!\\(\\\\)*)[\|]/, but this
-    # gives an "SyntaxError: (RegexpError) invalid pattern in look-behind" for the variable length look behind.
-    # Therefore one edge case is not handled properly: \\| (this should split, but it does not, because the escaped \ is not recognized)
-    # TODO: To solve all unescaping cases, regex is not suitable. A little parse should be written.
-    split_data = data.split /(?<=[^\\]\\\\)[\|]|(?<!\\)[\|]/
+    # Use a scanning parser to capture the HEADER_FIELDS
+    unprocessed_data = data
+    HEADER_FIELDS.each do |field_name|
+      match_data = HEADER_SCANNER.match(unprocessed_data)
+      break if match_data.nil? # missing fields
 
-    # To be invoked when config settings is set to TRUE for V1 field names (cef_ext.<fieldname>) the following code might be removed in upcoming Codec revision
+      escaped_field_value = match_data[1]
+      next if escaped_field_value.nil?
 
-    # To be invoked with default config settings to utilise the new field name formatting and flatten out the JSON document
-    # Store header fields
-    HEADER_FIELDS.each_with_index do |field_name, index|
-      store_header_field(event,field_name,split_data[index])
+      # process legal header escape sequences
+      unescaped_field_value = escaped_field_value.gsub(HEADER_ESCAPE_CAPTURE, '\1')
+
+      event.set(field_name, unescaped_field_value)
+      unprocessed_data = match_data.post_match
     end
+
     #Remainder is message
-    message = split_data[HEADER_FIELDS.size..-1].join('|')
+    message = unprocessed_data
 
     # Try and parse out the syslog header if there is one
     if event.get('cefVersion').include? ' '
@@ -145,36 +284,21 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     # Get rid of the CEF bit in the version
     event.set('cefVersion', event.get('cefVersion').sub(/^CEF:/, ''))
 
-    # Strip any whitespace from the message
-    if not message.nil? and message.include? '='
+    # Use a scanning parser to capture the Extension Key/Value Pairs
+    if message && message.include?('=')
       message = message.strip
 
-      # If the last KVP has no value, add an empty string, this prevents hash errors below
-      if message.end_with?('=')
-        message = message + ' ' unless message.end_with?('\=')
-      end
+      message.scan(EXTENSION_KEY_VALUE_SCANNER) do |extension_field_key, raw_extension_field_value|
+        # expand abbreviated extension field keys
+        extension_field_key = MAPPINGS.fetch(extension_field_key, extension_field_key)
 
-      # Insert custom delimiter to separate key-value pairs, to which some values will contain special characters
-      # This separator '|^^^' os tested to be unique
-      message = message.gsub((/(?:(\s+(\w+\=)))/),'|^^^\2')
+        # convert extension field name to strict legal field_reference, fixing field names with ambiguous array-like syntax
+        extension_field_key = extension_field_key.sub(EXTENSION_KEY_ARRAY_CAPTURE, '[\1]\2') if extension_field_key.end_with?(']')
 
-      # Appropriately tokenizing the additional fields when ArcSight connectors are sending events using "COMPLETE" mode processing.
-      # If these fields are NOT needed, then set the ArcSight processing mode for this destination to "FASTER" or "FASTEST"
-      # Refer to ArcSight's SmartConnector user configuration guide
-      message = message.gsub((/(\s+(\w+\.[^\s]\w+[^\|\s\.\=]+\=))/),'|^^^\2')
-      message = message.split('|^^^')
+        # process legal extension field value escapes
+        extension_field_value = raw_extension_field_value.gsub(EXTENSION_VALUE_ESCAPE_CAPTURE, '\1')
 
-      # Replaces the '=' with '***' to avoid conflict with strings with HTML content namely key-value pairs where the values contain HTML strings
-      # Example : requestUrl = http://<testdomain>:<port>?query=A
-      for i in 0..message.length-1
-        message[i] = message[i].sub(/\=/, "***")
-        message[i] = message[i].gsub(/\\=/, '=').gsub(/\\\\/, '\\')
-      end
-
-      message = message.map {|s| k, v = s.split('***'); "#{MAPPINGS[k] || k }=#{v}"}
-      message = message.each_with_object({}) do |k|
-        key, value = k.split(/\s*=\s*/,2)
-        event.set(key, value)
+        event.set(extension_field_key, extension_field_value)
       end
     end
 
@@ -296,44 +420,4 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   rescue TypeError, ArgumentError
     false
   end
-
-  def handle_v1_fields(event, split_data)
-    # Store header fields
-    DEPRECATED_HEADER_FIELDS.each_with_index do |field_name, index|
-      store_header_field(event,field_name,split_data[index])
-    end
-    #Remainder is message
-    message = split_data[DEPRECATED_HEADER_FIELDS.size..-1].join('|')
-
-    # Try and parse out the syslog header if there is one
-    if event.get('cef_version').include? ' '
-      split_cef_version= event.get('cef_version').rpartition(' ')
-      event.set('syslog', split_cef_version[0])
-      event.set('cef_version',split_cef_version[2])
-    end
-
-    # Get rid of the CEF bit in the version
-    event.set('cef_version', event.get('cef_version').sub(/^CEF:/, ''))
-
-    # Strip any whitespace from the message
-    if not message.nil? and message.include? '='
-      message = message.strip
-
-      # If the last KVP has no value, add an empty string, this prevents hash errors below
-      if message.end_with?('=')
-        message=message + ' ' unless message.end_with?('\=')
-      end
-
-      # Now parse the key value pairs into it
-      extensions = {}
-      message = message.split(/ ([\w\.]+)=/)
-      key, value = message.shift.split('=', 2)
-      extensions[key] = value.gsub(/\\=/, '=').gsub(/\\\\/, '\\')
-      Hash[*message].each{ |k, v| extensions[k] = v }
-      # And save the new has as the extensions
-      event.set('cef_ext', extensions)
-    end
-
-  end
-
 end
