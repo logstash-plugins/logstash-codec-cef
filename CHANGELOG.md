@@ -1,3 +1,6 @@
+## 5.0.6
+  - Added Make CEF encoder compliant to spec [#51](https://github.com/logstash-plugins/logstash-codec-cef/pull/51)
+
 ## 5.0.5
  - Fix handling of malformed inputs that have illegal unescaped-equals characters in extension field values (restores behaviour from <= v5.0.3 in some edge-cases) ([#56](https://github.com/logstash-plugins/logstash-codec-cef/issues/56))
 
