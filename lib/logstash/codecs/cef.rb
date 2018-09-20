@@ -46,6 +46,12 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
   # Fields to be included in CEV extension part as key/value pairs
   config :fields, :validate => :array, :default => []
+  
+  # When encoding to CEF, set this to true to adhere to the specifications and
+  # encode using the CEF key name (short name) for the CEF field names.
+  # Defaults to false to preserve previous behaviour that was to use the long
+  # version of the CEF field names.
+  config :reverse_mapping, :validate => :boolean, :default => false
 
   config :deprecated_v1_fields, :validate => :boolean, :obsolete => "This setting is obsolete"
 
@@ -164,6 +170,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       "mrt" => "managerReceiptTime",
       "amac" => "agentMacAddress"
   }
+
+  # Reverse mapping of CEF full field names to CEF extensions field names for encoding into a CEF event for output.
+  REVERSE_MAPPINGS = MAPPINGS.invert
 
   # A CEF Header is a sequence of zero or more:
   #  - backslash-escaped pipes; OR
@@ -390,13 +399,19 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
     return nil if val.nil?
 
+    key = sanitize_extension_key(fieldname)
+    
+    if @reverse_mapping
+      key = REVERSE_MAPPINGS[key] || key
+    end
+    
     case val
     when Array, Hash
-      return "#{sanitize_extension_key(fieldname)}=#{sanitize_extension_val(val.to_json)}"
+      return "#{key}=#{sanitize_extension_val(val.to_json)}"
     when LogStash::Timestamp
-      return "#{sanitize_extension_key(fieldname)}=#{val.to_s}"
+      return "#{key}=#{val.to_s}"
     else
-      return "#{sanitize_extension_key(fieldname)}=#{sanitize_extension_val(val)}"
+      return "#{key}=#{sanitize_extension_val(val)}"
     end
   end
 
