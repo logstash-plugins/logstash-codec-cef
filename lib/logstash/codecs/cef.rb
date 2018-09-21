@@ -125,6 +125,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       "duser" => "destinationUserName",
       "dvc" => "deviceAddress",
       "dvchost" => "deviceHostName",
+      "dvcmac" => "deviceMacAddress",
       "dvcpid" => "deviceProcessId",
       "end" => "endTime",
       "fname" => "fileName",
