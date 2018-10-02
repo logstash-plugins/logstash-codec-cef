@@ -1,3 +1,8 @@
+
+## 5.0.7
+  - Fixed minor doc inconsistencies (added reverse_mapping to options table, moved it to alpha order in option descriptions, fixed typo)
+  [#60](https://github.com/logstash-plugins/logstash-codec-cef/pull/60)
+
 ## 5.0.6
   - Added reverse_mapping option, which can be used to make encoder compliant to spec [#51](https://github.com/logstash-plugins/logstash-codec-cef/pull/51)
 
