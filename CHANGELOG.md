@@ -1,3 +1,5 @@
+## 6.0.0
+ - Removed obsolete `sev` and `deprecated_v1_fields` fields
 
 ## 5.0.7
   - Fixed minor doc inconsistencies (added reverse_mapping to options table, moved it to alpha order in option descriptions, fixed typo)

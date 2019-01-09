@@ -33,9 +33,6 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # to help you build a new value from other parts of the event.
   config :name, :validate => :string, :default => "Logstash"
 
-  # Obsolete severity field for CEF header
-  config :sev, :validate => :string, :obsolete => "This setting is obsolete, use :severity instead."
-
   # Severity field in CEF header. The new value can include `%{foo}` strings
   # to help you build a new value from other parts of the event.
   #
@@ -52,8 +49,6 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Defaults to false to preserve previous behaviour that was to use the long
   # version of the CEF field names.
   config :reverse_mapping, :validate => :boolean, :default => false
-
-  config :deprecated_v1_fields, :validate => :boolean, :obsolete => "This setting is obsolete"
 
   # If your input puts a delimiter between each CEF event, you'll want to set
   # this to be that delimiter.
