@@ -69,13 +69,6 @@ This setting allows the following character sequences to have special meaning:
 * `\\r` (backslash "r") - means carriage return (ASCII 0x0D)
 * `\\n` (backslash "n") - means newline (ASCII 0x0A)
 
-[id="plugins-{type}s-{plugin}-deprecated_v1_fields"]
-===== `deprecated_v1_fields`  (OBSOLETE)
-
-  * OBSOLETE WARNING: This configuration item is obsolete and will prevent the pipeline from starting if used
-  * Value type is <<boolean,boolean>>
-  * There is no default value for this setting.
-
 [id="plugins-{type}s-{plugin}-fields"]
 ===== `fields` 
 
@@ -110,16 +103,6 @@ to help you build a new value from other parts of the event.
   * Default value is `false`
 
 Set to true to adhere to the specifications and encode using the CEF key name (short name) for the CEF field names.
-
-
-[id="plugins-{type}s-{plugin}-sev"]
-===== `sev`  (OBSOLETE)
-
-  * OBSOLETE WARNING: This configuration item is obsolete and will prevent the pipeline from starting.
-  * Value type is <<string,string>>
-  * There is no default value for this setting.
-
-Obsolete severity field for CEF header use :severity instead.
 
 [id="plugins-{type}s-{plugin}-severity"]
 ===== `severity` 
