@@ -195,7 +195,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # by "subkey" sequence consisting of a literal dot (`.`) followed by a non-whitespace character, then one or more word
   # characters, and then one or more characters that do not convey semantic meaning within CEF (e.g., literal-pipe (`|`),
   # whitespace (`\s`), literal-dot (`.`), literal-equals (`=`), or literal-backslash ('\')).
-  EXTENSION_KEY_PATTERN = /(?:\w+(?:\.[^\s]\w+[^\|\s\.\=\\]+)?(?==))/
+  EXTENSION_KEY_PATTERN = /(?:\w+(?:\.\S\w*[^\|\s\.\=\\]+)?(?==))/
 
   # Some CEF extension keys seen in the wild use an undocumented array-like syntax that may not be compatible with
   # the Event API's strict-mode FieldReference parser (e.g., `fieldname[0]`).
