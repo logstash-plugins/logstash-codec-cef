@@ -558,9 +558,9 @@ describe LogStash::Codecs::CEF do
     let (:dots_in_keys) {'CEF:0|Vendor|Device|Version|13|my message|5|dvchost=loghost cat=traffic deviceSeverity=notice ad.nn=TEST src=192.168.0.1 destinationPort=53'}
     it "should be OK with dots in keys" do
       decode_one(subject, dots_in_keys) do |e|
-        insist { e.get("dvchost") } == "loghost"
+        insist { e.get("deviceHostName") } == "loghost"
         insist { e.get("ad.nn") } == 'TEST'
-        insist { e.get("src") } == '192.168.0.1'
+        insist { e.get("sourceAddress") } == '192.168.0.1'
         insist { e.get("destinationPort") } == '53'
       end
     end
