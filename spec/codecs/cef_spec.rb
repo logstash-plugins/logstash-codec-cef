@@ -580,6 +580,20 @@ describe LogStash::Codecs::CEF do
       end
     end
 
+    let(:preserve_complex_multiple_dot_notation_in_extension_fields) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 additional.dotfieldName=new_value ad.Authentification=MICROSOFT_AUTHENTICATION_PACKAGE_V1_0 ad.Error_,Code=3221225578 dst=12.121.122.82 ad.field[0]=field0 ad.foo.name[1]=new_name' }
+    it "should keep ad.fields" do
+      decode_one(subject, preserve_complex_multiple_dot_notation_in_extension_fields) do |e|
+        validate(e)
+        insist { e.get("sourceAddress") } == "10.0.0.192"
+        insist { e.get("destinationAddress") } == "12.121.122.82"
+        insist { e.get("[ad.field][0]") } == "field0"
+        insist { e.get("[ad.foo.name][1]") } == "new_name"
+        insist { e.get("ad.Authentification") } == "MICROSOFT_AUTHENTICATION_PACKAGE_V1_0"
+        insist { e.get('ad.Error_,Code') } == "3221225578"
+        insist { e.get("additional.dotfieldName") } == "new_value"
+      end
+    end
+
     let (:preserve_random_values_key_value_pairs_alongside_with_additional_fields) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 cs4=401 random.user Admin 0 23041A10181C0000  23041810181C0000  /CN\=random.user/OU\=User Login End-Entity  /CN\=TEST/OU\=Login CA TEST 34 additional.dotfieldName=new_value ad.Authentification=MICROSOFT_AUTHENTICATION_PACKAGE_V1_0 ad.Error_,Code=3221225578 dst=12.121.122.82 ad.field[0]=field0 ad.name[1]=new_name'}
     it "should correctly parse random values even with additional fields in message" do
       decode_one(subject, preserve_random_values_key_value_pairs_alongside_with_additional_fields) do |e|
