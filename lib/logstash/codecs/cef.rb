@@ -189,13 +189,16 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # commas, periods, and square-bracketed index offsets.
   #
   # To support this, we look for a specific sequence of characters that are followed by an equals sign. This pattern
-  # will correctly identify all strictly-legal keys, and will also match those that include a dot "subkey"
+  # will correctly identify all strictly-legal keys, and will also match those that include a dot-joined "subkeys" and
+  # square-bracketed array indexing
   #
   # That sequence must begin with one or more `\w` (word: alphanumeric + underscore), which _optionally_ may be followed
-  # by "subkey" sequence consisting of a literal dot (`.`) followed by a non-whitespace character, then one or more word
-  # characters, and then one or more characters that do not convey semantic meaning within CEF (e.g., literal-pipe (`|`),
-  # whitespace (`\s`), literal-dot (`.`), literal-equals (`=`), or literal-backslash ('\')).
-  EXTENSION_KEY_PATTERN = /(?:\w+(?:\.[^\s]\w+[^\|\s\.\=\\]+)?(?==))/
+  # by one or more "subkey" sequences and an optional square-bracketed index.
+  #
+  # To be understood by this implementation, a "subkey" sequence must consist of a literal dot (`.`) followed by one or
+  # more characters that do not convey semantic meaning within CEF (e.g., literal-dot (`.`), literal-equals (`=`),
+  # whitespace (`\s`), literal-pipe (`|`), literal-backslash ('\'), or literal-square brackets (`[` or `]`)).
+  EXTENSION_KEY_PATTERN = /(?:\w+(?:\.[^\.=\s\|\\\[\]]+)*(?:\[[0-9]+\])?(?==))/
 
   # Some CEF extension keys seen in the wild use an undocumented array-like syntax that may not be compatible with
   # the Event API's strict-mode FieldReference parser (e.g., `fieldname[0]`).
