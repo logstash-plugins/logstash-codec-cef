@@ -1,5 +1,5 @@
 ## 6.0.1
- - Fix support for deep dot notation [#73](https://github.com/logstash-plugins/logstash-codec-cef/pull/73)
+ - Fixed support for deep dot notation [#73](https://github.com/logstash-plugins/logstash-codec-cef/pull/73)
 
 ## 6.0.0
  - Removed obsolete `sev` and `deprecated_v1_fields` fields
