@@ -148,7 +148,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       "start" => "startTime",
       "suid" => "sourceUserId",
       "suser" => "sourceUserName",
-      "ahost" => "agentHost",
+      "ahost" => "agentHostName",
       "art" => "agentReceiptTime",
       "at" => "agentType",
       "aid" => "agentId",
