@@ -1,3 +1,6 @@
+## 6.1.1
+ - Fixed CEF short to long name translation for ahost/agentHostName field, according to documentation [#75](https://github.com/logstash-plugins/logstash-codec-cef/pull/75)
+
 ## 6.0.1
  - Fixed support for deep dot notation [#73](https://github.com/logstash-plugins/logstash-codec-cef/pull/73)
 
