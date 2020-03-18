@@ -1,5 +1,0 @@
-devenv:
-  image: hpess/devenv-jruby:master
-  entrypoint: /bin/bash
-  volumes:
-    - ./:/storage
