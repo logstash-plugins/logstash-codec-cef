@@ -317,19 +317,19 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     # "CEF:0|Elasticsearch|Logstash|1.0|Signature|Name|Sev|"
 
     vendor = sanitize_header_field(event.sprintf(@vendor))
-    vendor = self.class.get_config["vendor"][:default] if vendor == ""
+    vendor = self.class.get_config["vendor"][:default] if vendor.empty?
 
     product = sanitize_header_field(event.sprintf(@product))
-    product = self.class.get_config["product"][:default] if product == ""
+    product = self.class.get_config["product"][:default] if product.empty?
 
     version = sanitize_header_field(event.sprintf(@version))
-    version = self.class.get_config["version"][:default] if version == ""
+    version = self.class.get_config["version"][:default] if version.empty?
 
     signature = sanitize_header_field(event.sprintf(@signature))
-    signature = self.class.get_config["signature"][:default] if signature == ""
+    signature = self.class.get_config["signature"][:default] if signature.empty?
 
     name = sanitize_header_field(event.sprintf(@name))
-    name = self.class.get_config["name"][:default] if name == ""
+    name = self.class.get_config["name"][:default] if name.empty?
 
     severity = sanitize_severity(event, @severity)
 
@@ -345,18 +345,18 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Escape pipes and backslashes in the header. Equal signs are ok.
   # Newlines are forbidden.
   def sanitize_header_field(value)
-    output = ""
+    output = String.new
 
     value = value.to_s.gsub(/\r\n/, "\n")
 
     value.each_char{|c|
       case c
       when "\\", "|"
-        output += "\\" + c
+        output << "\\" << c
       when "\n", "\r"
-        output += " "
+        output << " "
       else
-        output += c
+        output << c
       end
     }
 
@@ -374,18 +374,18 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # CEF spec leaves it up to us to choose \r or \n for newline.
   # We choose \n as the default.
   def sanitize_extension_val(value)
-    output = ""
+    output = String.new
 
     value = value.to_s.gsub(/\r\n/, "\n")
 
     value.each_char{|c|
       case c
       when "\\", "="
-        output += "\\" + c
+        output << "\\" << c
       when "\n", "\r"
-        output += "\\n"
+        output << "\\n"
       else
-        output += c
+        output << c
       end
     }
 
