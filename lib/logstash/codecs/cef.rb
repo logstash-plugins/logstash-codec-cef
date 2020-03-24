@@ -339,7 +339,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
     # Should also probably set the fields sent
     header = ["CEF:0", vendor, product, version, signature, name, severity].join("|")
-    values = @fields.map {|fieldname| get_value(fieldname, event)}.compact.join(" ")
+    values = @fields.map { |fieldname| get_value(fieldname, event) }.compact.join(" ")
 
     @on_event.call(event, "#{header}|#{values}#{@delimiter}")
   end
@@ -420,7 +420,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   def sanitize_severity(event, severity)
     severity = sanitize_header_field(event.sprintf(severity)).strip
     severity = self.class.get_config["severity"][:default] unless valid_severity?(severity)
-    severity = severity.to_i.to_s
+    severity.to_i.to_s
   end
 
   def valid_severity?(sev)
