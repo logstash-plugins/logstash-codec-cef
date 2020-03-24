@@ -215,6 +215,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Cache of a scanner pattern that _captures_ extension field key/value pairs
   EXTENSION_KEY_VALUE_SCANNER = /(#{EXTENSION_KEY_PATTERN})=(#{EXTENSION_VALUE_PATTERN})\s*/
 
+  CEF_PREFIX = 'CEF:'.freeze
+
   public
   def initialize(params={})
     super(params)
@@ -279,14 +281,14 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     message = unprocessed_data
 
     # Try and parse out the syslog header if there is one
-    if event.get('cefVersion').include? ' '
-      split_cef_version= event.get('cefVersion').rpartition(' ')
+    if (cef_version = event.get('cefVersion')).include?(' ')
+      split_cef_version = cef_version.rpartition(' ')
       event.set('syslog', split_cef_version[0])
-      event.set('cefVersion',split_cef_version[2])
+      event.set('cefVersion', split_cef_version[2])
     end
 
     # Get rid of the CEF bit in the version
-    event.set('cefVersion', event.get('cefVersion').sub(/^CEF:/, ''))
+    event.set('cefVersion', delete_cef_prefix(event.get('cefVersion')))
 
     # Use a scanning parser to capture the Extension Key/Value Pairs
     if message && message.include?('=')
@@ -308,7 +310,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
     yield event
   rescue => e
-    @logger.error("Failed to decode CEF payload. Generating failure event with payload in message field.", :error => e.message, :backtrace => e.backtrace, :data => data)
+    @logger.error("Failed to decode CEF payload. Generating failure event with payload in message field.",
+                  :exception => e.class, :message => e.message, :backtrace => e.backtrace, :data => data)
     yield LogStash::Event.new("message" => data, "tags" => ["_cefparsefailure"])
   end
 
@@ -317,25 +320,25 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     # "CEF:0|Elasticsearch|Logstash|1.0|Signature|Name|Sev|"
 
     vendor = sanitize_header_field(event.sprintf(@vendor))
-    vendor = self.class.get_config["vendor"][:default] if vendor == ""
+    vendor = self.class.get_config["vendor"][:default] if vendor.empty?
 
     product = sanitize_header_field(event.sprintf(@product))
-    product = self.class.get_config["product"][:default] if product == ""
+    product = self.class.get_config["product"][:default] if product.empty?
 
     version = sanitize_header_field(event.sprintf(@version))
-    version = self.class.get_config["version"][:default] if version == ""
+    version = self.class.get_config["version"][:default] if version.empty?
 
     signature = sanitize_header_field(event.sprintf(@signature))
-    signature = self.class.get_config["signature"][:default] if signature == ""
+    signature = self.class.get_config["signature"][:default] if signature.empty?
 
     name = sanitize_header_field(event.sprintf(@name))
-    name = self.class.get_config["name"][:default] if name == ""
+    name = self.class.get_config["name"][:default] if name.empty?
 
     severity = sanitize_severity(event, @severity)
 
     # Should also probably set the fields sent
     header = ["CEF:0", vendor, product, version, signature, name, severity].join("|")
-    values = @fields.map {|fieldname| get_value(fieldname, event)}.compact.join(" ")
+    values = @fields.map { |fieldname| get_value(fieldname, event) }.compact.join(" ")
 
     @on_event.call(event, "#{header}|#{values}#{@delimiter}")
   end
@@ -345,18 +348,18 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Escape pipes and backslashes in the header. Equal signs are ok.
   # Newlines are forbidden.
   def sanitize_header_field(value)
-    output = ""
+    output = String.new
 
     value = value.to_s.gsub(/\r\n/, "\n")
 
     value.each_char{|c|
       case c
       when "\\", "|"
-        output += "\\" + c
+        output << "\\#{c}"
       when "\n", "\r"
-        output += " "
+        output << " "
       else
-        output += c
+        output << c
       end
     }
 
@@ -374,18 +377,18 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # CEF spec leaves it up to us to choose \r or \n for newline.
   # We choose \n as the default.
   def sanitize_extension_val(value)
-    output = ""
+    output = String.new
 
     value = value.to_s.gsub(/\r\n/, "\n")
 
     value.each_char{|c|
       case c
       when "\\", "="
-        output += "\\" + c
+        output << "\\#{c}"
       when "\n", "\r"
-        output += "\\n"
+        output << "\\n"
       else
-        output += c
+        output << c
       end
     }
 
@@ -416,7 +419,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   def sanitize_severity(event, severity)
     severity = sanitize_header_field(event.sprintf(severity)).strip
     severity = self.class.get_config["severity"][:default] unless valid_severity?(severity)
-    severity = severity.to_i.to_s
+    severity.to_i.to_s
   end
 
   def valid_severity?(sev)
@@ -426,5 +429,15 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     (f % 1 == 0) && f.between?(0,10)
   rescue TypeError, ArgumentError
     false
+  end
+
+  if Gem::Requirement.new(">= 2.5.0").satisfied_by? Gem::Version.new(RUBY_VERSION)
+    def delete_cef_prefix(cef_version)
+      cef_version.delete_prefix(CEF_PREFIX)
+    end
+  else
+    def delete_cef_prefix(cef_version)
+      cef_version.start_with?(CEF_PREFIX) ? cef_version[CEF_PREFIX.length..-1] : cef_version
+    end
   end
 end
