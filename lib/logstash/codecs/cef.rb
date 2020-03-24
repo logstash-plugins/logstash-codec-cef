@@ -215,6 +215,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Cache of a scanner pattern that _captures_ extension field key/value pairs
   EXTENSION_KEY_VALUE_SCANNER = /(#{EXTENSION_KEY_PATTERN})=(#{EXTENSION_VALUE_PATTERN})\s*/
 
+  CEF_PREFIX = 'CEF:'.freeze
+
   public
   def initialize(params={})
     super(params)
@@ -279,14 +281,15 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     message = unprocessed_data
 
     # Try and parse out the syslog header if there is one
-    if event.get('cefVersion').include? ' '
-      split_cef_version= event.get('cefVersion').rpartition(' ')
+    if (cef_version = event.get('cefVersion')).include?(' ')
+      split_cef_version = cef_version.rpartition(' ')
       event.set('syslog', split_cef_version[0])
-      event.set('cefVersion',split_cef_version[2])
+      event.set('cefVersion', split_cef_version[2])
     end
 
     # Get rid of the CEF bit in the version
-    event.set('cefVersion', event.get('cefVersion').sub(/^CEF:/, ''))
+    cef_version = event.get('cefVersion')
+    event.set('cefVersion', cef_version[CEF_PREFIX.length..-1]) if cef_version.start_with?(CEF_PREFIX)
 
     # Use a scanning parser to capture the Extension Key/Value Pairs
     if message && message.include?('=')
