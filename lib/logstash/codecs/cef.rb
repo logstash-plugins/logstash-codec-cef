@@ -288,8 +288,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     end
 
     # Get rid of the CEF bit in the version
-    cef_version = event.get('cefVersion')
-    event.set('cefVersion', cef_version[CEF_PREFIX.length..-1]) if cef_version.start_with?(CEF_PREFIX)
+    event.set('cefVersion', delete_cef_prefix(event.get('cefVersion')))
 
     # Use a scanning parser to capture the Extension Key/Value Pairs
     if message && message.include?('=')
@@ -430,5 +429,15 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     (f % 1 == 0) && f.between?(0,10)
   rescue TypeError, ArgumentError
     false
+  end
+
+  if Gem::Requirement.new(">= 2.5.0").satisfied_by? Gem::Version.new(RUBY_VERSION)
+    def delete_cef_prefix(cef_version)
+      cef_version.delete_prefix(CEF_PREFIX)
+    end
+  else
+    def delete_cef_prefix(cef_version)
+      cef_version.start_with?(CEF_PREFIX) ? cef_version[CEF_PREFIX.length..-1] : cef_version
+    end
   end
 end
