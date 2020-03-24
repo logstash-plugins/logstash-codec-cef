@@ -2,6 +2,10 @@
 require "logstash/util/buftok"
 require "logstash/util/charset"
 require "logstash/codecs/base"
+
+require 'logstash/plugin_mixins/ecs_compatibility_support'
+require 'logstash/plugin_mixins/event_support'
+
 require "json"
 
 # Implementation of a Logstash codec for the ArcSight Common Event Format (CEF)
@@ -11,6 +15,10 @@ require "json"
 # If this codec receives a payload from an input that is not a valid CEF message, then it will
 # produce an event with the payload as the 'message' field and a '_cefparsefailure' tag.
 class LogStash::Codecs::CEF < LogStash::Codecs::Base
+
+  include LogStash::PluginMixins::ECSCompatibilitySupport
+  include LogStash::PluginMixins::EventSupport
+
   config_name "cef"
 
   # Device vendor field in CEF header. The new value can include `%{foo}` strings
@@ -71,6 +79,13 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # If raw_data_field is set, during decode of an event an additional field with
   # the provided name is added, which contains the raw data.
   config :raw_data_field, :validate => :string
+
+  # Defines a target field for placing decoded fields.
+  # If this setting is omitted, data gets stored at the root (top level) of the event.
+  # The target is only relevant while decoding data into a new event.
+  #
+  # NOTE: `raw_data_field` is always stored as requested, regardless of the `target` setting.
+  config :target, :validate => :string
 
   HEADER_FIELDS = ['cefVersion','deviceVendor','deviceProduct','deviceVersion','deviceEventClassId','name','severity']
 
@@ -247,8 +262,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   end
 
   def handle(data, &block)
-    event = LogStash::Event.new
+    event = new_event
     event.set(raw_data_field, data) unless raw_data_field.nil?
+    event = EventTargetDecorator.wrap(event, target)
 
     @utf8_charset.convert(data)
 
@@ -308,7 +324,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       end
     end
 
-    yield event
+    yield event.unwrap
   rescue => e
     @logger.error("Failed to decode CEF payload. Generating failure event with payload in message field.",
                   :exception => e.class, :message => e.message, :backtrace => e.backtrace, :data => data)
