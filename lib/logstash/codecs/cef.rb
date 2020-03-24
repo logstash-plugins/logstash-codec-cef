@@ -356,7 +356,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     value.each_char{|c|
       case c
       when "\\", "|"
-        output << "\\" << c
+        output << "\\#{c}"
       when "\n", "\r"
         output << " "
       else
