@@ -311,7 +311,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
     yield event
   rescue => e
-    @logger.error("Failed to decode CEF payload. Generating failure event with payload in message field.", :error => e.message, :backtrace => e.backtrace, :data => data)
+    @logger.error("Failed to decode CEF payload. Generating failure event with payload in message field.",
+                  :exception => e.class, :message => e.message, :backtrace => e.backtrace, :data => data)
     yield LogStash::Event.new("message" => data, "tags" => ["_cefparsefailure"])
   end
 
