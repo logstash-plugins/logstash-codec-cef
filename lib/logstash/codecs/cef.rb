@@ -215,6 +215,28 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Cache of a scanner pattern that _captures_ extension field key/value pairs
   EXTENSION_KEY_VALUE_SCANNER = /(#{EXTENSION_KEY_PATTERN})=(#{EXTENSION_VALUE_PATTERN})\s*/
 
+  ##
+  # @see CEF#sanitize_header_field
+  HEADER_FIELD_SANITIZER_MAPPING = {
+    "\\" => "\\\\",
+    "|"  => "\\|",
+    "\n" => " ",
+    "\r" => " ",
+  }
+  HEADER_FIELD_SANITIZER_PATTERN = Regexp.union(HEADER_FIELD_SANITIZER_MAPPING.keys)
+  private_constant :HEADER_FIELD_SANITIZER_MAPPING, :HEADER_FIELD_SANITIZER_PATTERN
+
+  ##
+  # @see CEF#sanitize_extension_val
+  EXTENSION_VALUE_SANITIZER_MAPPING = {
+    "\\" => "\\\\",
+    "="  => "\\=",
+    "\n" => "\\n",
+    "\r" => "\\n",
+  }
+  EXTENSION_VALUE_SANITIZER_PATTERN = Regexp.union(EXTENSION_VALUE_SANITIZER_MAPPING.keys)
+  private_constant :EXTENSION_VALUE_SANITIZER_MAPPING, :EXTENSION_VALUE_SANITIZER_PATTERN
+
   CEF_PREFIX = 'CEF:'.freeze
 
   public
@@ -348,22 +370,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Escape pipes and backslashes in the header. Equal signs are ok.
   # Newlines are forbidden.
   def sanitize_header_field(value)
-    output = String.new
-
-    value = value.to_s.gsub(/\r\n/, "\n")
-
-    value.each_char{|c|
-      case c
-      when "\\", "|"
-        output << "\\#{c}"
-      when "\n", "\r"
-        output << " "
-      else
-        output << c
-      end
-    }
-
-    return output
+    value.to_s
+         .gsub("\r\n", "\n")
+         .gsub(HEADER_FIELD_SANITIZER_PATTERN, HEADER_FIELD_SANITIZER_MAPPING)
   end
 
   # Keys must be made up of a single word, with no spaces
@@ -377,22 +386,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # CEF spec leaves it up to us to choose \r or \n for newline.
   # We choose \n as the default.
   def sanitize_extension_val(value)
-    output = String.new
-
-    value = value.to_s.gsub(/\r\n/, "\n")
-
-    value.each_char{|c|
-      case c
-      when "\\", "="
-        output << "\\#{c}"
-      when "\n", "\r"
-        output << "\\n"
-      else
-        output << c
-      end
-    }
-
-    return output
+    value.to_s
+         .gsub("\r\n", "\n")
+         .gsub(EXTENSION_VALUE_SANITIZER_PATTERN, EXTENSION_VALUE_SANITIZER_MAPPING)
   end
 
   def get_value(fieldname, event)
