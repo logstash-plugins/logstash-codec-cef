@@ -378,8 +378,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Keys must be made up of a single word, with no spaces
   # must be alphanumeric
   def sanitize_extension_key(value)
-    value = value.to_s.gsub(/[^a-zA-Z0-9]/, "")
-    return value
+    value.to_s
+         .gsub(/[^a-zA-Z0-9]/, "")
   end
 
   # Escape equal signs in the extensions. Canonicalize newlines.
