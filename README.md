@@ -1,6 +1,6 @@
 # Logstash Plugin
 
-[![Travis Build Status](https://travis-ci.org/logstash-plugins/logstash-codec-cef.svg)](https://travis-ci.org/logstash-plugins/logstash-codec-cef)
+[![Travis Build Status](https://travis-ci.com/logstash-plugins/logstash-codec-cef.svg)](https://travis-ci.com/logstash-plugins/logstash-codec-cef)
 
 This is a plugin for [Logstash](https://github.com/elastic/logstash).
 
