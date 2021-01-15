@@ -72,8 +72,6 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # the provided name is added, which contains the raw data.
   config :raw_data_field, :validate => :string
 
-  HEADER_FIELDS = ['cefVersion','deviceVendor','deviceProduct','deviceVersion','deviceEventClassId','name','severity']
-
   # A CEF Header is a sequence of zero or more:
   #  - backslash-escaped pipes; OR
   #  - backslash-escaped backslashes; OR
@@ -161,6 +159,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       @buffer = FileWatch::BufferedTokenizer.new(@delimiter)
     end
 
+    setup_header_fields!
     setup_mappings!
   end
 
@@ -192,7 +191,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
     # Use a scanning parser to capture the HEADER_FIELDS
     unprocessed_data = data
-    HEADER_FIELDS.each do |field_name|
+    @header_fields.each do |field_name|
       match_data = HEADER_SCANNER.match(unprocessed_data)
       break if match_data.nil? # missing fields
 
@@ -332,6 +331,21 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     (f % 1 == 0) && f.between?(0,10)
   rescue TypeError, ArgumentError
     false
+  end
+
+  # setup `@header_fields`, an ordered array of field names
+  def setup_header_fields!
+    return if @header_fields
+
+    @header_fields = %w[
+      cefVersion
+      deviceVendor
+      deviceProduct
+      deviceVersion
+      deviceEventClassId
+      name
+      severity
+    ].freeze
   end
 
   # Translating and flattening the CEF extensions with known field names as documented in the Common Event Format whitepaper
