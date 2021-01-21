@@ -72,6 +72,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # the provided name is added, which contains the raw data.
   config :raw_data_field, :validate => :string
 
+  config :device, :validate => %w(observer host), :default => 'observer'
+
   # A CEF Header is a sequence of zero or more:
   #  - backslash-escaped pipes; OR
   #  - backslash-escaped backslashes; OR
@@ -353,95 +355,99 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   def setup_mappings!
     return if @mapping
 
+    # TODO: Once using ECSCompatibilitySupport v1.1, we get ecs_select for free
+    chooser = Chooser.new([:disabled, :v1])
+    ecs_select = chooser.choose(ecs_compatibility, 'ecs_compatibility mode', LogStash::ConfigurationError)
+
     @mapping = {
-      "act"       => "deviceAction",
-      "app"       => "applicationProtocol",
-      "c6a1"      => "deviceCustomIPv6Address1",
-      "c6a1Label" => "deviceCustomIPv6Address1Label",
-      "c6a2"      => "deviceCustomIPv6Address2",
-      "c6a2Label" => "deviceCustomIPv6Address2Label",
-      "c6a3"      => "deviceCustomIPv6Address3",
-      "c6a3Label" => "deviceCustomIPv6Address3Label",
-      "c6a4"      => "deviceCustomIPv6Address4",
-      "c6a4Label" => "deviceCustomIPv6Address4Label",
-      "cat"       => "deviceEventCategory",
-      "cfp1"      => "deviceCustomFloatingPoint1",
-      "cfp1Label" => "deviceCustomFloatingPoint1Label",
-      "cfp2"      => "deviceCustomFloatingPoint2",
-      "cfp2Label" => "deviceCustomFloatingPoint2Label",
-      "cfp3"      => "deviceCustomFloatingPoint3",
-      "cfp3Label" => "deviceCustomFloatingPoint3Label",
-      "cfp4"      => "deviceCustomFloatingPoint4",
-      "cfp4Label" => "deviceCustomFloatingPoint4Label",
-      "cn1"       => "deviceCustomNumber1",
-      "cn1Label"  => "deviceCustomNumber1Label",
-      "cn2"       => "deviceCustomNumber2",
-      "cn2Label"  => "deviceCustomNumber2Label",
-      "cn3"       => "deviceCustomNumber3",
-      "cn3Label"  => "deviceCustomNumber3Label",
-      "cnt"       => "baseEventCount",
-      "cs1"       => "deviceCustomString1",
-      "cs1Label"  => "deviceCustomString1Label",
-      "cs2"       => "deviceCustomString2",
-      "cs2Label"  => "deviceCustomString2Label",
-      "cs3"       => "deviceCustomString3",
-      "cs3Label"  => "deviceCustomString3Label",
-      "cs4"       => "deviceCustomString4",
-      "cs4Label"  => "deviceCustomString4Label",
-      "cs5"       => "deviceCustomString5",
-      "cs5Label"  => "deviceCustomString5Label",
-      "cs6"       => "deviceCustomString6",
-      "cs6Label"  => "deviceCustomString6Label",
-      "dhost"     => "destinationHostName",
-      "dmac"      => "destinationMacAddress",
-      "dntdom"    => "destinationNtDomain",
-      "dpid"      => "destinationProcessId",
-      "dpriv"     => "destinationUserPrivileges",
-      "dproc"     => "destinationProcessName",
-      "dpt"       => "destinationPort",
-      "dst"       => "destinationAddress",
-      "duid"      => "destinationUserId",
-      "duser"     => "destinationUserName",
-      "dvc"       => "deviceAddress",
-      "dvchost"   => "deviceHostName",
-      "dvcpid"    => "deviceProcessId",
-      "end"       => "endTime",
-      "fname"     => "fileName",
-      "fsize"     => "fileSize",
-      "in"        => "bytesIn",
-      "msg"       => "message",
-      "out"       => "bytesOut",
-      "outcome"   => "eventOutcome",
-      "proto"     => "transportProtocol",
-      "request"   => "requestUrl",
-      "rt"        => "deviceReceiptTime",
-      "shost"     => "sourceHostName",
-      "smac"      => "sourceMacAddress",
-      "sntdom"    => "sourceNtDomain",
-      "spid"      => "sourceProcessId",
-      "spriv"     => "sourceUserPrivileges",
-      "sproc"     => "sourceProcessName",
-      "spt"       => "sourcePort",
-      "src"       => "sourceAddress",
-      "start"     => "startTime",
-      "suid"      => "sourceUserId",
-      "suser"     => "sourceUserName",
-      "ahost"     => "agentHostName",
-      "art"       => "agentReceiptTime",
-      "at"        => "agentType",
-      "aid"       => "agentId",
-      "_cefVer"   => "cefVersion",
-      "agt"       => "agentAddress",
-      "av"        => "agentVersion",
-      "atz"       => "agentTimeZone",
-      "dtz"       => "destinationTimeZone",
-      "slong"     => "sourceLongitude",
-      "slat"      => "sourceLatitude",
-      "dlong"     => "destinationLongitude",
-      "dlat"      => "destinationLatitude",
-      "catdt"     => "categoryDeviceType",
-      "mrt"       => "managerReceiptTime",
-      "amac"      => "agentMacAddress",
+      "act"       => ecs_select[disabled: "deviceAction",                    v1: "[event][action]"],
+      "app"       => ecs_select[disabled: "applicationProtocol",             v1: "[network][protocol]"],
+      "c6a1"      => ecs_select[disabled: "deviceCustomIPv6Address1",        v1: "[cef][device_custom_ipv6_address_1][value]"],
+      "c6a1Label" => ecs_select[disabled: "deviceCustomIPv6Address1Label",   v1: "[cef][device_custom_ipv6_address_1][label]"],
+      "c6a2"      => ecs_select[disabled: "deviceCustomIPv6Address2",        v1: "[cef][device_custom_ipv6_address_2][value]"],
+      "c6a2Label" => ecs_select[disabled: "deviceCustomIPv6Address2Label",   v1: "[cef][device_custom_ipv6_address_2][label]"],
+      "c6a3"      => ecs_select[disabled: "deviceCustomIPv6Address3",        v1: "[cef][device_custom_ipv6_address_3][value]"],
+      "c6a3Label" => ecs_select[disabled: "deviceCustomIPv6Address3Label",   v1: "[cef][device_custom_ipv6_address_3][label]"],
+      "c6a4"      => ecs_select[disabled: "deviceCustomIPv6Address4",        v1: "[cef][device_custom_ipv6_address_4][value]"],
+      "c6a4Label" => ecs_select[disabled: "deviceCustomIPv6Address4Label",   v1: "[cef][device_custom_ipv6_address_4][label]"],
+      "cat"       => ecs_select[disabled: "deviceEventCategory",             v1: "[cef][category]"],
+      "cfp1"      => ecs_select[disabled: "deviceCustomFloatingPoint1",      v1: "[cef][device_custom_floating_point_1][value]"],
+      "cfp1Label" => ecs_select[disabled: "deviceCustomFloatingPoint1Label", v1: "[cef][device_custom_floating_point_1][label]"],
+      "cfp2"      => ecs_select[disabled: "deviceCustomFloatingPoint2",      v1: "[cef][device_custom_floating_point_2][value]"],
+      "cfp2Label" => ecs_select[disabled: "deviceCustomFloatingPoint2Label", v1: "[cef][device_custom_floating_point_2][label]"],
+      "cfp3"      => ecs_select[disabled: "deviceCustomFloatingPoint3",      v1: "[cef][device_custom_floating_point_3][value]"],
+      "cfp3Label" => ecs_select[disabled: "deviceCustomFloatingPoint3Label", v1: "[cef][device_custom_floating_point_3][label]"],
+      "cfp4"      => ecs_select[disabled: "deviceCustomFloatingPoint4",      v1: "[cef][device_custom_floating_point_4][value]"],
+      "cfp4Label" => ecs_select[disabled: "deviceCustomFloatingPoint4Label", v1: "[cef][device_custom_floating_point_4][label]"],
+      "cn1"       => ecs_select[disabled: "deviceCustomNumber1",             v1: "[cef][device_custom_number_1][value]"],
+      "cn1Label"  => ecs_select[disabled: "deviceCustomNumber1Label",        v1: "[cef][device_custom_number_1][label]"],
+      "cn2"       => ecs_select[disabled: "deviceCustomNumber2",             v1: "[cef][device_custom_number_2][value]"],
+      "cn2Label"  => ecs_select[disabled: "deviceCustomNumber2Label",        v1: "[cef][device_custom_number_2][label]"],
+      "cn3"       => ecs_select[disabled: "deviceCustomNumber3",             v1: "[cef][device_custom_number_3][value]"],
+      "cn3Label"  => ecs_select[disabled: "deviceCustomNumber3Label",        v1: "[cef][device_custom_number_3][label]"],
+      "cnt"       => ecs_select[disabled: "baseEventCount",                  v1: "[cef][base_event_count]"],
+      "cs1"       => ecs_select[disabled: "deviceCustomString1",             v1: "[cef][device_custom_string_1][value]"],
+      "cs1Label"  => ecs_select[disabled: "deviceCustomString1Label",        v1: "[cef][device_custom_string_1][label]"],
+      "cs2"       => ecs_select[disabled: "deviceCustomString2",             v1: "[cef][device_custom_string_2][value]"],
+      "cs2Label"  => ecs_select[disabled: "deviceCustomString2Label",        v1: "[cef][device_custom_string_2][label]"],
+      "cs3"       => ecs_select[disabled: "deviceCustomString3",             v1: "[cef][device_custom_string_3][value]"],
+      "cs3Label"  => ecs_select[disabled: "deviceCustomString3Label",        v1: "[cef][device_custom_string_3][label]"],
+      "cs4"       => ecs_select[disabled: "deviceCustomString4",             v1: "[cef][device_custom_string_4][value]"],
+      "cs4Label"  => ecs_select[disabled: "deviceCustomString4Label",        v1: "[cef][device_custom_string_4][label]"],
+      "cs5"       => ecs_select[disabled: "deviceCustomString5",             v1: "[cef][device_custom_string_5][value]"],
+      "cs5Label"  => ecs_select[disabled: "deviceCustomString5Label",        v1: "[cef][device_custom_string_5][label]"],
+      "cs6"       => ecs_select[disabled: "deviceCustomString6",             v1: "[cef][device_custom_string_6][value]"],
+      "cs6Label"  => ecs_select[disabled: "deviceCustomString6Label",        v1: "[cef][device_custom_string_6][label]"],
+      "dhost"     => ecs_select[disabled: "destinationHostName",             v1: "[destination][domain]"],
+      "dmac"      => ecs_select[disabled: "destinationMacAddress",           v1: "[destination][mac]"],
+      "dntdom"    => ecs_select[disabled: "destinationNtDomain",             v1: "[destination][registered_domain]"],
+      "dpid"      => ecs_select[disabled: "destinationProcessId",            v1: "[destination][process][pid]"],
+      "dpriv"     => ecs_select[disabled: "destinationUserPrivileges",       v1: "[destination][user][group][name]"],
+      "dproc"     => ecs_select[disabled: "destinationProcessName",          v1: "[destination][process][name]"],
+      "dpt"       => ecs_select[disabled: "destinationPort",                 v1: "[destination][port]"],
+      "dst"       => ecs_select[disabled: "destinationAddress",              v1: "[destination][ip]"],
+      "duid"      => ecs_select[disabled: "destinationUserId",               v1: "[destination][user][id]"],
+      "duser"     => ecs_select[disabled: "destinationUserName",             v1: "[destination][user][name]"],
+      "dvc"       => ecs_select[disabled: "deviceAddress",                   v1: "[#{@device}][ip]"],
+      "dvchost"   => ecs_select[disabled: "deviceHostName",                  v1: "[#{@device}][name]"],
+      "dvcpid"    => ecs_select[disabled: "deviceProcessId",                 v1: "[process][pid]"],
+      "end"       => ecs_select[disabled: "endTime",                         v1: "[event][end]"],
+      "fname"     => ecs_select[disabled: "fileName",                        v1: "[file][name]"],
+      "fsize"     => ecs_select[disabled: "fileSize",                        v1: "[file][size]"],
+      "in"        => ecs_select[disabled: "bytesIn",                         v1: "[source][bytes]"],
+      "msg"       => ecs_select[disabled: "message",                         v1: "[message]"],
+      "out"       => ecs_select[disabled: "bytesOut",                        v1: "[destination][bytes]"],
+      "outcome"   => ecs_select[disabled: "eventOutcome",                    v1: "[event][outcome]"],
+      "proto"     => ecs_select[disabled: "transportProtocol",               v1: "[network][transport]"],
+      "request"   => ecs_select[disabled: "requestUrl",                      v1: "[url][original]"],
+      "rt"        => ecs_select[disabled: "deviceReceiptTime",               v1: "[@timestamp]"], # TODO: test the magic handling
+      "shost"     => ecs_select[disabled: "sourceHostName",                  v1: "[source][domain]"],
+      "smac"      => ecs_select[disabled: "sourceMacAddress",                v1: "[source][mac]"],
+      "sntdom"    => ecs_select[disabled: "sourceNtDomain",                  v1: "[source][registered_domain]"], # TODO: if `sourceDnsDomain` not present?
+      "spid"      => ecs_select[disabled: "sourceProcessId",                 v1: "[source][process][pid]"],
+      "spriv"     => ecs_select[disabled: "sourceUserPrivileges",            v1: "[source][user][group][name]"],
+      "sproc"     => ecs_select[disabled: "sourceProcessName",               v1: "[source][process][name]"],
+      "spt"       => ecs_select[disabled: "sourcePort",                      v1: "[source][port]"],
+      "src"       => ecs_select[disabled: "sourceAddress",                   v1: "[source][ip]"],
+      "start"     => ecs_select[disabled: "startTime",                       v1: "[event][start]"],
+      "suid"      => ecs_select[disabled: "sourceUserId",                    v1: "[source][user][id]"],
+      "suser"     => ecs_select[disabled: "sourceUserName",                  v1: "[source][user][name]"],
+      "ahost"     => ecs_select[disabled: "agentHostName",                   v1: "[agent][name]"],
+      "art"       => ecs_select[disabled: "agentReceiptTime",                v1: "[event][created]"],
+      "at"        => ecs_select[disabled: "agentType",                       v1: "[agent][type]"],
+      "aid"       => ecs_select[disabled: "agentId",                         v1: "[agent][id]"],
+      "_cefVer"   => ecs_select[disabled: "cefVersion",                      v1: "[cef][version]"],
+      "agt"       => ecs_select[disabled: "agentAddress",                    v1: "[agent][ip]"],
+      "av"        => ecs_select[disabled: "agentVersion",                    v1: "[agent][version]"],
+      "atz"       => ecs_select[disabled: "agentTimeZone",                   v1: "[agent][type]"],
+      "dtz"       => ecs_select[disabled: "destinationTimeZone",             v1: "[event][timezone]"],
+      "slong"     => ecs_select[disabled: "sourceLongitude",                 v1: "[source][geo][location][lon]"],
+      "slat"      => ecs_select[disabled: "sourceLatitude",                  v1: "[source][geo][location][lat]"],
+      "dlong"     => ecs_select[disabled: "destinationLongitude",            v1: "[destination][geo][location][lon]"],
+      "dlat"      => ecs_select[disabled: "destinationLatitude",             v1: "[destination][geo][location][lon]"],
+      "catdt"     => ecs_select[disabled: "categoryDeviceType",              v1: "[cef][device_type]"],
+      "mrt"       => ecs_select[disabled: "managerReceiptTime",              v1: "[event][ingested]"],
+      "amac"      => ecs_select[disabled: "agentMacAddress",                 v1: "[agent][mac]"],
     }.freeze
 
     @mapping_inverted = @mapping.invert.freeze
@@ -454,6 +460,72 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   else
     def delete_cef_prefix(cef_version)
       cef_version.start_with?(CEF_PREFIX) ? cef_version[CEF_PREFIX.length..-1] : cef_version
+    end
+  end
+
+  class Chooser
+    ##
+    # @param supported_choices [Array[Symbol]]
+    def initialize(supported_choices)
+      @supported_choices = supported_choices.dup.freeze
+    end
+
+    ##
+    # @param choice [Symbol]
+    # @param error_name [#to_s] the name of this choice, to be used in case of an error
+    # @param error_class [Exception] the exception class to use in case of an error
+    # @return [Choice]
+    def choose(choice, error_name="choice", error_class=ArgumentError)
+      if !@supported_choices.include?(choice)
+        message = sprintf("unsupported %s `%s`; expected one of %s", error_name, choice.to_s, @supported_choices.map(&:to_s))
+        # logger.error(message)
+        fail(error_class, message)
+      end
+
+      Choice.new(self, choice)
+    end
+
+    ##
+    # Used when making a choice, ensures that the providing code supplies all possible choices.
+    # @see Choice#value_from
+    # @api private
+    def validate!(defined_choices)
+      missing = @supported_choices - defined_choices
+      fail(ArgumentError, "missing required options #{missing}") if missing.any?
+
+      unknown = defined_choices - @supported_choices
+      fail(ArgumentError, "unsupported options #{unknown}") if unknown.any?
+    end
+
+    ##
+    # A `Choice` represents a chosen value from the set supported by its `Chooser`.
+    # It can be used to safely select a value from a mapping at runtime using `Choice#value_from`.
+    class Choice
+
+      ##
+      # @api private
+      # @see Chooser#choice
+      #
+      # @param chooser [Chooser]
+      # @param choice [Symbol]
+      def initialize(chooser, choice)
+        @chooser = chooser
+        @choice = choice
+      end
+
+      ##
+      # With the current choice value, select one of the provided options.
+      # @param options [Hash{Symbol=>Object}]: the options to chose between.
+      #                                        it is an `ArgumentError` to provide a different set of
+      #                                        options than those this `Chooser` was initialized with.
+      #                                        This ensures that all reachable code implements all
+      #                                        supported options.
+      # @return [Object]
+      def value_from(options)
+        @chooser.validate!(options.keys)
+        options.fetch(@choice)
+      end
+      alias_method :[], :value_from
     end
   end
 end

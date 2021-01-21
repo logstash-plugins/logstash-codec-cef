@@ -678,12 +678,17 @@ describe LogStash::Codecs::CEF do
     end
 
     context 'non-UTF-8 message' do
+      let(:logger_stub) { double('Logger').as_null_object }
+      before(:each) do
+        allow_any_instance_of(described_class).to receive(:logger).and_return(logger_stub)
+      end
       let(:message) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=192.168.1.11 target=aaaaaああああaaaa msg=Description Omitted'.encode('SHIFT_JIS') }
       it 'should emit message unparsed with _cefparsefailure tag' do
         decode_one(subject, message.dup) do |event|
           insist { event.get("message").bytes.to_a } == message.bytes.to_a
           insist { event.get("tags") } == ['_cefparsefailure']
         end
+        expect(logger_stub).to have_received(:error).with(/Failed to decode CEF payload/, any_args)
       end
     end
 
