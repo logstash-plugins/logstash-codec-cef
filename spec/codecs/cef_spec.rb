@@ -1,16 +1,19 @@
 # encoding: utf-8
+require 'logstash/util'
 require "logstash/devutils/rspec/spec_helper"
 require "insist"
 require "logstash/codecs/cef"
 require "logstash/event"
 require "json"
 
+require 'logstash/plugin_mixins/ecs_compatibility_support/spec_helper'
+
 describe LogStash::Codecs::CEF do
   subject do
     next LogStash::Codecs::CEF.new
   end
 
-  context "#encode" do
+  context "#encode", :ecs_compatibility_support do
     subject(:codec) { LogStash::Codecs::CEF.new }
 
     let(:results)   { [] }
@@ -210,25 +213,90 @@ describe LogStash::Codecs::CEF do
       codec.encode(event)
       expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|foo=[0-9TZ.:-]+$/m)
     end
-    
-    it "should encode the CEF field names to their long versions" do
-      # This is with the default value of "reverse_mapping" that is "false".
-      codec.on_event{|data, newdata| results << newdata}
-      codec.fields = [ "deviceAction", "applicationProtocol", "deviceCustomIPv6Address1", "deviceCustomIPv6Address1Label", "deviceCustomIPv6Address2", "deviceCustomIPv6Address2Label", "deviceCustomIPv6Address3", "deviceCustomIPv6Address3Label", "deviceCustomIPv6Address4", "deviceCustomIPv6Address4Label", "deviceEventCategory", "deviceCustomFloatingPoint1", "deviceCustomFloatingPoint1Label", "deviceCustomFloatingPoint2", "deviceCustomFloatingPoint2Label", "deviceCustomFloatingPoint3", "deviceCustomFloatingPoint3Label", "deviceCustomFloatingPoint4", "deviceCustomFloatingPoint4Label", "deviceCustomNumber1", "deviceCustomNumber1Label", "deviceCustomNumber2", "deviceCustomNumber2Label", "deviceCustomNumber3", "deviceCustomNumber3Label", "baseEventCount", "deviceCustomString1", "deviceCustomString1Label", "deviceCustomString2", "deviceCustomString2Label", "deviceCustomString3", "deviceCustomString3Label", "deviceCustomString4", "deviceCustomString4Label", "deviceCustomString5", "deviceCustomString5Label", "deviceCustomString6", "deviceCustomString6Label", "destinationHostName", "destinationMacAddress", "destinationNtDomain", "destinationProcessId", "destinationUserPrivileges", "destinationProcessName", "destinationPort", "destinationAddress", "destinationUserId", "destinationUserName", "deviceAddress", "deviceHostName", "deviceProcessId", "endTime", "fileName", "fileSize", "bytesIn", "message", "bytesOut", "eventOutcome", "transportProtocol", "requestUrl", "deviceReceiptTime", "sourceHostName", "sourceMacAddress", "sourceNtDomain", "sourceProcessId", "sourceUserPrivileges", "sourceProcessName", "sourcePort", "sourceAddress", "startTime", "sourceUserId", "sourceUserName", "agentHostName", "agentReceiptTime", "agentType", "agentId", "agentAddress", "agentVersion", "agentTimeZone", "destinationTimeZone", "sourceLongitude", "sourceLatitude", "destinationLongitude", "destinationLatitude", "categoryDeviceType", "managerReceiptTime", "agentMacAddress" ]
-      event = LogStash::Event.new("deviceAction" => "foobar", "applicationProtocol" => "foobar", "deviceCustomIPv6Address1" => "foobar", "deviceCustomIPv6Address1Label" => "foobar", "deviceCustomIPv6Address2" => "foobar", "deviceCustomIPv6Address2Label" => "foobar", "deviceCustomIPv6Address3" => "foobar", "deviceCustomIPv6Address3Label" => "foobar", "deviceCustomIPv6Address4" => "foobar", "deviceCustomIPv6Address4Label" => "foobar", "deviceEventCategory" => "foobar", "deviceCustomFloatingPoint1" => "foobar", "deviceCustomFloatingPoint1Label" => "foobar", "deviceCustomFloatingPoint2" => "foobar", "deviceCustomFloatingPoint2Label" => "foobar", "deviceCustomFloatingPoint3" => "foobar", "deviceCustomFloatingPoint3Label" => "foobar", "deviceCustomFloatingPoint4" => "foobar", "deviceCustomFloatingPoint4Label" => "foobar", "deviceCustomNumber1" => "foobar", "deviceCustomNumber1Label" => "foobar", "deviceCustomNumber2" => "foobar", "deviceCustomNumber2Label" => "foobar", "deviceCustomNumber3" => "foobar", "deviceCustomNumber3Label" => "foobar", "baseEventCount" => "foobar", "deviceCustomString1" => "foobar", "deviceCustomString1Label" => "foobar", "deviceCustomString2" => "foobar", "deviceCustomString2Label" => "foobar", "deviceCustomString3" => "foobar", "deviceCustomString3Label" => "foobar", "deviceCustomString4" => "foobar", "deviceCustomString4Label" => "foobar", "deviceCustomString5" => "foobar", "deviceCustomString5Label" => "foobar", "deviceCustomString6" => "foobar", "deviceCustomString6Label" => "foobar", "destinationHostName" => "foobar", "destinationMacAddress" => "foobar", "destinationNtDomain" => "foobar", "destinationProcessId" => "foobar", "destinationUserPrivileges" => "foobar", "destinationProcessName" => "foobar", "destinationPort" => "foobar", "destinationAddress" => "foobar", "destinationUserId" => "foobar", "destinationUserName" => "foobar", "deviceAddress" => "foobar", "deviceHostName" => "foobar", "deviceProcessId" => "foobar", "endTime" => "foobar", "fileName" => "foobar", "fileSize" => "foobar", "bytesIn" => "foobar", "message" => "foobar", "bytesOut" => "foobar", "eventOutcome" => "foobar", "transportProtocol" => "foobar", "requestUrl" => "foobar", "deviceReceiptTime" => "foobar", "sourceHostName" => "foobar", "sourceMacAddress" => "foobar", "sourceNtDomain" => "foobar", "sourceProcessId" => "foobar", "sourceUserPrivileges" => "foobar", "sourceProcessName"=> "foobar", "sourcePort" => "foobar", "sourceAddress" => "foobar", "startTime" => "foobar", "sourceUserId" => "foobar", "sourceUserName" => "foobar", "agentHostName" => "foobar", "agentReceiptTime" => "foobar", "agentType" => "foobar", "agentId" => "foobar", "agentAddress" => "foobar", "agentVersion" => "foobar", "agentTimeZone" => "foobar", "destinationTimeZone" => "foobar", "sourceLongitude" => "foobar", "sourceLatitude" => "foobar", "destinationLongitude" => "foobar", "destinationLatitude" => "foobar", "categoryDeviceType" => "foobar", "managerReceiptTime" => "foobar", "agentMacAddress" => "foobar")
-      codec.encode(event)
-      expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|deviceAction=foobar applicationProtocol=foobar deviceCustomIPv6Address1=foobar deviceCustomIPv6Address1Label=foobar deviceCustomIPv6Address2=foobar deviceCustomIPv6Address2Label=foobar deviceCustomIPv6Address3=foobar deviceCustomIPv6Address3Label=foobar deviceCustomIPv6Address4=foobar deviceCustomIPv6Address4Label=foobar deviceEventCategory=foobar deviceCustomFloatingPoint1=foobar deviceCustomFloatingPoint1Label=foobar deviceCustomFloatingPoint2=foobar deviceCustomFloatingPoint2Label=foobar deviceCustomFloatingPoint3=foobar deviceCustomFloatingPoint3Label=foobar deviceCustomFloatingPoint4=foobar deviceCustomFloatingPoint4Label=foobar deviceCustomNumber1=foobar deviceCustomNumber1Label=foobar deviceCustomNumber2=foobar deviceCustomNumber2Label=foobar deviceCustomNumber3=foobar deviceCustomNumber3Label=foobar baseEventCount=foobar deviceCustomString1=foobar deviceCustomString1Label=foobar deviceCustomString2=foobar deviceCustomString2Label=foobar deviceCustomString3=foobar deviceCustomString3Label=foobar deviceCustomString4=foobar deviceCustomString4Label=foobar deviceCustomString5=foobar deviceCustomString5Label=foobar deviceCustomString6=foobar deviceCustomString6Label=foobar destinationHostName=foobar destinationMacAddress=foobar destinationNtDomain=foobar destinationProcessId=foobar destinationUserPrivileges=foobar destinationProcessName=foobar destinationPort=foobar destinationAddress=foobar destinationUserId=foobar destinationUserName=foobar deviceAddress=foobar deviceHostName=foobar deviceProcessId=foobar endTime=foobar fileName=foobar fileSize=foobar bytesIn=foobar message=foobar bytesOut=foobar eventOutcome=foobar transportProtocol=foobar requestUrl=foobar deviceReceiptTime=foobar sourceHostName=foobar sourceMacAddress=foobar sourceNtDomain=foobar sourceProcessId=foobar sourceUserPrivileges=foobar sourceProcessName=foobar sourcePort=foobar sourceAddress=foobar startTime=foobar sourceUserId=foobar sourceUserName=foobar agentHostName=foobar agentReceiptTime=foobar agentType=foobar agentId=foobar agentAddress=foobar agentVersion=foobar agentTimeZone=foobar destinationTimeZone=foobar sourceLongitude=foobar sourceLatitude=foobar destinationLongitude=foobar destinationLatitude=foobar categoryDeviceType=foobar managerReceiptTime=foobar agentMacAddress=foobar$/m)
-    end
 
-    context "with reverse_mapping set to true" do
-      subject(:codec) { LogStash::Codecs::CEF.new("reverse_mapping" => true) }
+    ecs_compatibility_matrix(:disabled,:v1) do |ecs_select|
+      before(:each) do
+        allow_any_instance_of(described_class).to receive(:ecs_compatibility).and_return(ecs_compatibility)
+      end
 
-      it "should encode the CEF field names to their short versions" do
+      it "should encode the CEF field names to their long versions" do
+        # This is with the default value of "reverse_mapping" that is "false".
         codec.on_event{|data, newdata| results << newdata}
         codec.fields = [ "deviceAction", "applicationProtocol", "deviceCustomIPv6Address1", "deviceCustomIPv6Address1Label", "deviceCustomIPv6Address2", "deviceCustomIPv6Address2Label", "deviceCustomIPv6Address3", "deviceCustomIPv6Address3Label", "deviceCustomIPv6Address4", "deviceCustomIPv6Address4Label", "deviceEventCategory", "deviceCustomFloatingPoint1", "deviceCustomFloatingPoint1Label", "deviceCustomFloatingPoint2", "deviceCustomFloatingPoint2Label", "deviceCustomFloatingPoint3", "deviceCustomFloatingPoint3Label", "deviceCustomFloatingPoint4", "deviceCustomFloatingPoint4Label", "deviceCustomNumber1", "deviceCustomNumber1Label", "deviceCustomNumber2", "deviceCustomNumber2Label", "deviceCustomNumber3", "deviceCustomNumber3Label", "baseEventCount", "deviceCustomString1", "deviceCustomString1Label", "deviceCustomString2", "deviceCustomString2Label", "deviceCustomString3", "deviceCustomString3Label", "deviceCustomString4", "deviceCustomString4Label", "deviceCustomString5", "deviceCustomString5Label", "deviceCustomString6", "deviceCustomString6Label", "destinationHostName", "destinationMacAddress", "destinationNtDomain", "destinationProcessId", "destinationUserPrivileges", "destinationProcessName", "destinationPort", "destinationAddress", "destinationUserId", "destinationUserName", "deviceAddress", "deviceHostName", "deviceProcessId", "endTime", "fileName", "fileSize", "bytesIn", "message", "bytesOut", "eventOutcome", "transportProtocol", "requestUrl", "deviceReceiptTime", "sourceHostName", "sourceMacAddress", "sourceNtDomain", "sourceProcessId", "sourceUserPrivileges", "sourceProcessName", "sourcePort", "sourceAddress", "startTime", "sourceUserId", "sourceUserName", "agentHostName", "agentReceiptTime", "agentType", "agentId", "agentAddress", "agentVersion", "agentTimeZone", "destinationTimeZone", "sourceLongitude", "sourceLatitude", "destinationLongitude", "destinationLatitude", "categoryDeviceType", "managerReceiptTime", "agentMacAddress" ]
         event = LogStash::Event.new("deviceAction" => "foobar", "applicationProtocol" => "foobar", "deviceCustomIPv6Address1" => "foobar", "deviceCustomIPv6Address1Label" => "foobar", "deviceCustomIPv6Address2" => "foobar", "deviceCustomIPv6Address2Label" => "foobar", "deviceCustomIPv6Address3" => "foobar", "deviceCustomIPv6Address3Label" => "foobar", "deviceCustomIPv6Address4" => "foobar", "deviceCustomIPv6Address4Label" => "foobar", "deviceEventCategory" => "foobar", "deviceCustomFloatingPoint1" => "foobar", "deviceCustomFloatingPoint1Label" => "foobar", "deviceCustomFloatingPoint2" => "foobar", "deviceCustomFloatingPoint2Label" => "foobar", "deviceCustomFloatingPoint3" => "foobar", "deviceCustomFloatingPoint3Label" => "foobar", "deviceCustomFloatingPoint4" => "foobar", "deviceCustomFloatingPoint4Label" => "foobar", "deviceCustomNumber1" => "foobar", "deviceCustomNumber1Label" => "foobar", "deviceCustomNumber2" => "foobar", "deviceCustomNumber2Label" => "foobar", "deviceCustomNumber3" => "foobar", "deviceCustomNumber3Label" => "foobar", "baseEventCount" => "foobar", "deviceCustomString1" => "foobar", "deviceCustomString1Label" => "foobar", "deviceCustomString2" => "foobar", "deviceCustomString2Label" => "foobar", "deviceCustomString3" => "foobar", "deviceCustomString3Label" => "foobar", "deviceCustomString4" => "foobar", "deviceCustomString4Label" => "foobar", "deviceCustomString5" => "foobar", "deviceCustomString5Label" => "foobar", "deviceCustomString6" => "foobar", "deviceCustomString6Label" => "foobar", "destinationHostName" => "foobar", "destinationMacAddress" => "foobar", "destinationNtDomain" => "foobar", "destinationProcessId" => "foobar", "destinationUserPrivileges" => "foobar", "destinationProcessName" => "foobar", "destinationPort" => "foobar", "destinationAddress" => "foobar", "destinationUserId" => "foobar", "destinationUserName" => "foobar", "deviceAddress" => "foobar", "deviceHostName" => "foobar", "deviceProcessId" => "foobar", "endTime" => "foobar", "fileName" => "foobar", "fileSize" => "foobar", "bytesIn" => "foobar", "message" => "foobar", "bytesOut" => "foobar", "eventOutcome" => "foobar", "transportProtocol" => "foobar", "requestUrl" => "foobar", "deviceReceiptTime" => "foobar", "sourceHostName" => "foobar", "sourceMacAddress" => "foobar", "sourceNtDomain" => "foobar", "sourceProcessId" => "foobar", "sourceUserPrivileges" => "foobar", "sourceProcessName"=> "foobar", "sourcePort" => "foobar", "sourceAddress" => "foobar", "startTime" => "foobar", "sourceUserId" => "foobar", "sourceUserName" => "foobar", "agentHostName" => "foobar", "agentReceiptTime" => "foobar", "agentType" => "foobar", "agentId" => "foobar", "agentAddress" => "foobar", "agentVersion" => "foobar", "agentTimeZone" => "foobar", "destinationTimeZone" => "foobar", "sourceLongitude" => "foobar", "sourceLatitude" => "foobar", "destinationLongitude" => "foobar", "destinationLatitude" => "foobar", "categoryDeviceType" => "foobar", "managerReceiptTime" => "foobar", "agentMacAddress" => "foobar")
         codec.encode(event)
-        expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|act=foobar app=foobar c6a1=foobar c6a1Label=foobar c6a2=foobar c6a2Label=foobar c6a3=foobar c6a3Label=foobar c6a4=foobar c6a4Label=foobar cat=foobar cfp1=foobar cfp1Label=foobar cfp2=foobar cfp2Label=foobar cfp3=foobar cfp3Label=foobar cfp4=foobar cfp4Label=foobar cn1=foobar cn1Label=foobar cn2=foobar cn2Label=foobar cn3=foobar cn3Label=foobar cnt=foobar cs1=foobar cs1Label=foobar cs2=foobar cs2Label=foobar cs3=foobar cs3Label=foobar cs4=foobar cs4Label=foobar cs5=foobar cs5Label=foobar cs6=foobar cs6Label=foobar dhost=foobar dmac=foobar dntdom=foobar dpid=foobar dpriv=foobar dproc=foobar dpt=foobar dst=foobar duid=foobar duser=foobar dvc=foobar dvchost=foobar dvcpid=foobar end=foobar fname=foobar fsize=foobar in=foobar msg=foobar out=foobar outcome=foobar proto=foobar request=foobar rt=foobar shost=foobar smac=foobar sntdom=foobar spid=foobar spriv=foobar sproc=foobar spt=foobar src=foobar start=foobar suid=foobar suser=foobar ahost=foobar art=foobar at=foobar aid=foobar agt=foobar av=foobar atz=foobar dtz=foobar slong=foobar slat=foobar dlong=foobar dlat=foobar catdt=foobar mrt=foobar amac=foobar$/m)
+        expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|deviceAction=foobar applicationProtocol=foobar deviceCustomIPv6Address1=foobar deviceCustomIPv6Address1Label=foobar deviceCustomIPv6Address2=foobar deviceCustomIPv6Address2Label=foobar deviceCustomIPv6Address3=foobar deviceCustomIPv6Address3Label=foobar deviceCustomIPv6Address4=foobar deviceCustomIPv6Address4Label=foobar deviceEventCategory=foobar deviceCustomFloatingPoint1=foobar deviceCustomFloatingPoint1Label=foobar deviceCustomFloatingPoint2=foobar deviceCustomFloatingPoint2Label=foobar deviceCustomFloatingPoint3=foobar deviceCustomFloatingPoint3Label=foobar deviceCustomFloatingPoint4=foobar deviceCustomFloatingPoint4Label=foobar deviceCustomNumber1=foobar deviceCustomNumber1Label=foobar deviceCustomNumber2=foobar deviceCustomNumber2Label=foobar deviceCustomNumber3=foobar deviceCustomNumber3Label=foobar baseEventCount=foobar deviceCustomString1=foobar deviceCustomString1Label=foobar deviceCustomString2=foobar deviceCustomString2Label=foobar deviceCustomString3=foobar deviceCustomString3Label=foobar deviceCustomString4=foobar deviceCustomString4Label=foobar deviceCustomString5=foobar deviceCustomString5Label=foobar deviceCustomString6=foobar deviceCustomString6Label=foobar destinationHostName=foobar destinationMacAddress=foobar destinationNtDomain=foobar destinationProcessId=foobar destinationUserPrivileges=foobar destinationProcessName=foobar destinationPort=foobar destinationAddress=foobar destinationUserId=foobar destinationUserName=foobar deviceAddress=foobar deviceHostName=foobar deviceProcessId=foobar endTime=foobar fileName=foobar fileSize=foobar bytesIn=foobar message=foobar bytesOut=foobar eventOutcome=foobar transportProtocol=foobar requestUrl=foobar deviceReceiptTime=foobar sourceHostName=foobar sourceMacAddress=foobar sourceNtDomain=foobar sourceProcessId=foobar sourceUserPrivileges=foobar sourceProcessName=foobar sourcePort=foobar sourceAddress=foobar startTime=foobar sourceUserId=foobar sourceUserName=foobar agentHostName=foobar agentReceiptTime=foobar agentType=foobar agentId=foobar agentAddress=foobar agentVersion=foobar agentTimeZone=foobar destinationTimeZone=foobar sourceLongitude=foobar sourceLatitude=foobar destinationLongitude=foobar destinationLatitude=foobar categoryDeviceType=foobar managerReceiptTime=foobar agentMacAddress=foobar$/m)
+      end
+
+      if ecs_select.active_mode != :disabled
+        let(:event_flat_hash) do
+          {
+            "[event][action]" => "floop", # deviceAction
+            "[network][protocol]" => "https", # applicationProtocol
+            "[cef][device_custom_ipv6_address_1][value]" => "4302:c0a5:0bb9:2dfd:7b4e:97f7:a328:98a9", # deviceCustomIPv6Address1
+            "[cef][device_custom_ipv6_address_1][label]" => "internal-interface", # deviceCustomIPv6Address1Label
+            "[observer][ip]" => "123.45.67.89", # deviceAddress
+            "[observer][name]" => "banana", # deviceHostName
+            "[user_agent][original]" => "'Foo-Bar/2018.1.7; Email:user@example.com; Guid:test='", # requestClientApplication
+          }
+        end
+
+        let(:event) do
+          event_flat_hash.each_with_object(LogStash::Event.new) do |(fr,v),memo|
+            memo.set(fr, v)
+          end
+        end
+
+        it 'encodes the ECS field names to their CEF name' do
+          codec.on_event{|data, newdata| results << newdata}
+          codec.fields = event_flat_hash.keys
+
+          codec.encode(event)
+
+          expect(results.first).to match(%r{^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|deviceAction=floop applicationProtocol=https deviceCustomIPv6Address1=4302:c0a5:0bb9:2dfd:7b4e:97f7:a328:98a9 deviceCustomIPv6Address1Label=internal-interface deviceAddress=123\.45\.67\.89 deviceHostName=banana requestClientApplication='Foo-Bar/2018\.1\.7; Email:user@example\.com; Guid:test\\='$}m)
+        end
+      end
+
+      context "with reverse_mapping set to true" do
+        subject(:codec) { LogStash::Codecs::CEF.new("reverse_mapping" => true) }
+
+        it "should encode the CEF field names to their short versions" do
+          codec.on_event{|data, newdata| results << newdata}
+          codec.fields = [ "deviceAction", "applicationProtocol", "deviceCustomIPv6Address1", "deviceCustomIPv6Address1Label", "deviceCustomIPv6Address2", "deviceCustomIPv6Address2Label", "deviceCustomIPv6Address3", "deviceCustomIPv6Address3Label", "deviceCustomIPv6Address4", "deviceCustomIPv6Address4Label", "deviceEventCategory", "deviceCustomFloatingPoint1", "deviceCustomFloatingPoint1Label", "deviceCustomFloatingPoint2", "deviceCustomFloatingPoint2Label", "deviceCustomFloatingPoint3", "deviceCustomFloatingPoint3Label", "deviceCustomFloatingPoint4", "deviceCustomFloatingPoint4Label", "deviceCustomNumber1", "deviceCustomNumber1Label", "deviceCustomNumber2", "deviceCustomNumber2Label", "deviceCustomNumber3", "deviceCustomNumber3Label", "baseEventCount", "deviceCustomString1", "deviceCustomString1Label", "deviceCustomString2", "deviceCustomString2Label", "deviceCustomString3", "deviceCustomString3Label", "deviceCustomString4", "deviceCustomString4Label", "deviceCustomString5", "deviceCustomString5Label", "deviceCustomString6", "deviceCustomString6Label", "destinationHostName", "destinationMacAddress", "destinationNtDomain", "destinationProcessId", "destinationUserPrivileges", "destinationProcessName", "destinationPort", "destinationAddress", "destinationUserId", "destinationUserName", "deviceAddress", "deviceHostName", "deviceProcessId", "endTime", "fileName", "fileSize", "bytesIn", "message", "bytesOut", "eventOutcome", "transportProtocol", "requestUrl", "deviceReceiptTime", "sourceHostName", "sourceMacAddress", "sourceNtDomain", "sourceProcessId", "sourceUserPrivileges", "sourceProcessName", "sourcePort", "sourceAddress", "startTime", "sourceUserId", "sourceUserName", "agentHostName", "agentReceiptTime", "agentType", "agentId", "agentAddress", "agentVersion", "agentTimeZone", "destinationTimeZone", "sourceLongitude", "sourceLatitude", "destinationLongitude", "destinationLatitude", "categoryDeviceType", "managerReceiptTime", "agentMacAddress" ]
+          event = LogStash::Event.new("deviceAction" => "foobar", "applicationProtocol" => "foobar", "deviceCustomIPv6Address1" => "foobar", "deviceCustomIPv6Address1Label" => "foobar", "deviceCustomIPv6Address2" => "foobar", "deviceCustomIPv6Address2Label" => "foobar", "deviceCustomIPv6Address3" => "foobar", "deviceCustomIPv6Address3Label" => "foobar", "deviceCustomIPv6Address4" => "foobar", "deviceCustomIPv6Address4Label" => "foobar", "deviceEventCategory" => "foobar", "deviceCustomFloatingPoint1" => "foobar", "deviceCustomFloatingPoint1Label" => "foobar", "deviceCustomFloatingPoint2" => "foobar", "deviceCustomFloatingPoint2Label" => "foobar", "deviceCustomFloatingPoint3" => "foobar", "deviceCustomFloatingPoint3Label" => "foobar", "deviceCustomFloatingPoint4" => "foobar", "deviceCustomFloatingPoint4Label" => "foobar", "deviceCustomNumber1" => "foobar", "deviceCustomNumber1Label" => "foobar", "deviceCustomNumber2" => "foobar", "deviceCustomNumber2Label" => "foobar", "deviceCustomNumber3" => "foobar", "deviceCustomNumber3Label" => "foobar", "baseEventCount" => "foobar", "deviceCustomString1" => "foobar", "deviceCustomString1Label" => "foobar", "deviceCustomString2" => "foobar", "deviceCustomString2Label" => "foobar", "deviceCustomString3" => "foobar", "deviceCustomString3Label" => "foobar", "deviceCustomString4" => "foobar", "deviceCustomString4Label" => "foobar", "deviceCustomString5" => "foobar", "deviceCustomString5Label" => "foobar", "deviceCustomString6" => "foobar", "deviceCustomString6Label" => "foobar", "destinationHostName" => "foobar", "destinationMacAddress" => "foobar", "destinationNtDomain" => "foobar", "destinationProcessId" => "foobar", "destinationUserPrivileges" => "foobar", "destinationProcessName" => "foobar", "destinationPort" => "foobar", "destinationAddress" => "foobar", "destinationUserId" => "foobar", "destinationUserName" => "foobar", "deviceAddress" => "foobar", "deviceHostName" => "foobar", "deviceProcessId" => "foobar", "endTime" => "foobar", "fileName" => "foobar", "fileSize" => "foobar", "bytesIn" => "foobar", "message" => "foobar", "bytesOut" => "foobar", "eventOutcome" => "foobar", "transportProtocol" => "foobar", "requestUrl" => "foobar", "deviceReceiptTime" => "foobar", "sourceHostName" => "foobar", "sourceMacAddress" => "foobar", "sourceNtDomain" => "foobar", "sourceProcessId" => "foobar", "sourceUserPrivileges" => "foobar", "sourceProcessName"=> "foobar", "sourcePort" => "foobar", "sourceAddress" => "foobar", "startTime" => "foobar", "sourceUserId" => "foobar", "sourceUserName" => "foobar", "agentHostName" => "foobar", "agentReceiptTime" => "foobar", "agentType" => "foobar", "agentId" => "foobar", "agentAddress" => "foobar", "agentVersion" => "foobar", "agentTimeZone" => "foobar", "destinationTimeZone" => "foobar", "sourceLongitude" => "foobar", "sourceLatitude" => "foobar", "destinationLongitude" => "foobar", "destinationLatitude" => "foobar", "categoryDeviceType" => "foobar", "managerReceiptTime" => "foobar", "agentMacAddress" => "foobar")
+          codec.encode(event)
+          expect(results.first).to match(/^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|act=foobar app=foobar c6a1=foobar c6a1Label=foobar c6a2=foobar c6a2Label=foobar c6a3=foobar c6a3Label=foobar c6a4=foobar c6a4Label=foobar cat=foobar cfp1=foobar cfp1Label=foobar cfp2=foobar cfp2Label=foobar cfp3=foobar cfp3Label=foobar cfp4=foobar cfp4Label=foobar cn1=foobar cn1Label=foobar cn2=foobar cn2Label=foobar cn3=foobar cn3Label=foobar cnt=foobar cs1=foobar cs1Label=foobar cs2=foobar cs2Label=foobar cs3=foobar cs3Label=foobar cs4=foobar cs4Label=foobar cs5=foobar cs5Label=foobar cs6=foobar cs6Label=foobar dhost=foobar dmac=foobar dntdom=foobar dpid=foobar dpriv=foobar dproc=foobar dpt=foobar dst=foobar duid=foobar duser=foobar dvc=foobar dvchost=foobar dvcpid=foobar end=foobar fname=foobar fsize=foobar in=foobar msg=foobar out=foobar outcome=foobar proto=foobar request=foobar rt=foobar shost=foobar smac=foobar sntdom=foobar spid=foobar spriv=foobar sproc=foobar spt=foobar src=foobar start=foobar suid=foobar suser=foobar ahost=foobar art=foobar at=foobar aid=foobar agt=foobar av=foobar atz=foobar dtz=foobar slong=foobar slat=foobar dlong=foobar dlat=foobar catdt=foobar mrt=foobar amac=foobar$/m)
+        end
+
+        if ecs_select.active_mode != :disabled
+          let(:event_flat_hash) do
+            {
+              "[event][action]" => "floop", # act
+              "[network][protocol]" => "https", # app
+              "[cef][device_custom_ipv6_address_1][value]" => "4302:c0a5:0bb9:2dfd:7b4e:97f7:a328:98a9", # c6a1
+              "[cef][device_custom_ipv6_address_1][label]" => "internal-interface", # c6a1Label
+              "[observer][ip]" => "123.45.67.89", # dvc
+              "[observer][name]" => "banana", # dvchost
+              "[user_agent][original]" => "'Foo-Bar/2018.1.7; Email:user@example.com; Guid:test='",
+            }
+          end
+
+          let(:event) do
+            event_flat_hash.each_with_object(LogStash::Event.new) do |(fr,v),memo|
+              memo.set(fr, v)
+            end
+          end
+
+
+          it 'encodes the ECS field names to their CEF keys' do
+            codec.on_event{|data, newdata| results << newdata}
+            codec.fields = event_flat_hash.keys
+
+            codec.encode(event)
+
+            expect(results.first).to match(%r{^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|act=floop app=https c6a1=4302:c0a5:0bb9:2dfd:7b4e:97f7:a328:98a9 c6a1Label=internal-interface dvc=123\.45\.67\.89 dvchost=banana requestClientApplication='Foo-Bar/2018\.1\.7; Email:user@example\.com; Guid:test\\='$}m)
+          end
+        end
       end
     end
   end
@@ -306,11 +374,21 @@ describe LogStash::Codecs::CEF do
     end
   end
 
-  context "#decode" do
-    let (:message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
-
+  module DecodeHelpers
     def validate(e)
       insist { e.is_a?(LogStash::Event) }
+      send("validate_ecs_#{ecs_compatibility}", e)
+    end
+
+    def validate_ecs_v1(e)
+      insist { e.get('[cef][version]') } == "0"
+      insist { e.get('[observer][version]') } == "1.0"
+      insist { e.get('[event][code]') } == "100"
+      insist { e.get('[cef][name]') } == "trojan successfully stopped"
+      insist { e.get('[event][severity]') } == "10"
+    end
+
+    def validate_ecs_disabled(e)
       insist { e.get('cefVersion') } == "0"
       insist { e.get('deviceVersion') } == "1.0"
       insist { e.get('deviceEventClassId') } == "100"
@@ -334,7 +412,11 @@ describe LogStash::Codecs::CEF do
       fail("Expected one event, got #{events.size} events: #{events.inspect}") unless events.size == 1
       event = events.first
 
-      yield event if block_given?
+      if block_given?
+        aggregate_failures('decode one') do
+          yield event
+        end
+      end
 
       event
     end
@@ -360,340 +442,361 @@ describe LogStash::Codecs::CEF do
 
       events
     end
+  end
 
-    context "with delimiter set" do
-      # '\r\n' in single quotes to simulate the real input from a config
-      # containing \r\n as 4-character sequence in the config:
-      #
-      #   delimiter => "\r\n"
-      #
-      # Related: https://github.com/elastic/logstash/issues/1645
-      subject(:codec) { LogStash::Codecs::CEF.new("delimiter" => '\r\n') }
+  context "#decode", :ecs_compatibility_support do
+    ecs_compatibility_matrix(:disabled,:v1) do |ecs_select|
+      before(:each) do
+        allow_any_instance_of(described_class).to receive(:ecs_compatibility).and_return(ecs_compatibility)
+      end
 
-      it "should parse on the delimiter " do
-        do_decode(subject,message) do |e|
-          raise Exception.new("Should not get here. If we do, it means the decoder emitted an event before the delimiter was seen?")
+      let (:message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+
+      include DecodeHelpers
+
+      context "with delimiter set" do
+        # '\r\n' in single quotes to simulate the real input from a config
+        # containing \r\n as 4-character sequence in the config:
+        #
+        #   delimiter => "\r\n"
+        #
+        # Related: https://github.com/elastic/logstash/issues/1645
+        subject(:codec) { LogStash::Codecs::CEF.new("delimiter" => '\r\n') }
+
+        it "should parse on the delimiter " do
+          do_decode(subject,message) do |e|
+            raise Exception.new("Should not get here. If we do, it means the decoder emitted an event before the delimiter was seen?")
+          end
+
+          decode_one(subject, "\r\n") do |e|
+            validate(e)
+            insist { e.get(ecs_select[disabled: "deviceVendor", v1:"[observer][vendor]"]) } == "security"
+            insist { e.get(ecs_select[disabled: "deviceProduct", v1:"[observer][product]"]) } == "threatmanager"
+          end
         end
+      end
 
-        decode_one(subject, "\r\n") do |e|
+      context 'when a CEF header ends with a pair of properly-escaped backslashes' do
+        let(:backslash) { '\\' }
+        let(:pipe) { '|' }
+        let(:message) { "CEF:0|security|threatmanager|1.0|100|double backslash" +
+                        backslash + backslash + # escaped backslash
+                        backslash + backslash + # escaped backslash
+                        "|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+
+        it 'should include the backslashes unescaped' do
+          event = decode_one(subject, message)
+
+          expect(event.get(ecs_select[disabled:'name',    v1:'[cef][name]'])).to eq('double backslash' + backslash + backslash )
+          expect(event.get(ecs_select[disabled:'severity',v1:'[event][severity]'])).to eq('10') # ensure we didn't consume the separator
+        end
+      end
+
+      it "should parse the cef headers" do
+        decode_one(subject, message) do |e|
           validate(e)
-          insist { e.get("deviceVendor") } == "security"
-          insist { e.get("deviceProduct") } == "threatmanager"
+          insist { e.get(ecs_select[disabled:"deviceVendor", v1:"[observer][vendor]"]) } == "security"
+          insist { e.get(ecs_select[disabled:"deviceProduct",v1:"[observer][product]"]) } == "threatmanager"
         end
       end
-    end
 
-    context 'when a CEF header ends with a pair of properly-escaped backslashes' do
-      let(:backslash) { '\\' }
-      let(:pipe) { '|' }
-      let(:message) { "CEF:0|security|threatmanager|1.0|100|double backslash" +
-                      backslash + backslash + # escaped backslash
-                      backslash + backslash + # escaped backslash
-                      "|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
-
-      it 'should include the backslashes unescaped' do
-        event = decode_one(subject, message)
-
-        expect(event.get('name')).to eq('double backslash' + backslash + backslash )
-        expect(event.get('severity')).to eq('10') # ensure we didn't consume the separator
+      it "should parse the cef body" do
+        decode_one(subject, message) do |e|
+          insist { e.get(ecs_select[disabled:"sourceAddress",     v1:"[source][ip]"])} == "10.0.0.192"
+          insist { e.get(ecs_select[disabled:"destinationAddress",v1:"[destination][ip]"]) } == "12.121.122.82"
+          insist { e.get(ecs_select[disabled:"sourcePort",        v1:"[source][port]"]) } == "1232"
+        end
       end
-    end
 
-    it "should parse the cef headers" do
-      decode_one(subject, message) do |e|
-        validate(e)
-        insist { e.get("deviceVendor") } == "security"
-        insist { e.get("deviceProduct") } == "threatmanager"
+      let (:missing_headers) { "CEF:0|||1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+      it "should be OK with missing CEF headers (multiple pipes in sequence)" do
+        decode_one(subject, missing_headers) do |e|
+          validate(e)
+          insist { e.get(ecs_select[disabled:"deviceVendor", v1:"[observer][vendor]"]) } == ""
+          insist { e.get(ecs_select[disabled:"deviceProduct",v1:"[observer][product]"]) } == ""
+        end
       end
-    end
 
-    it "should parse the cef body" do
-      decode_one(subject, message) do |e|
-        insist { e.get("sourceAddress")} == "10.0.0.192"
-        insist { e.get("destinationAddress") } == "12.121.122.82"
-        insist { e.get("sourcePort") } == "1232"
+      let (:leading_whitespace) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10| src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+      it "should strip leading whitespace from the message" do
+        decode_one(subject, leading_whitespace) do |e|
+          validate(e)
+        end
       end
-    end
 
-    let (:missing_headers) { "CEF:0|||1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
-    it "should be OK with missing CEF headers (multiple pipes in sequence)" do
-      decode_one(subject, missing_headers) do |e|
-        validate(e)
-        insist { e.get("deviceVendor") } == ""
-        insist { e.get("deviceProduct") } == ""
+      let (:escaped_pipes) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this\|has an escaped pipe' }
+      it "should be OK with escaped pipes in the message" do
+        decode_one(subject, escaped_pipes) do |e|
+          insist { e.get("moo") } == 'this\|has an escaped pipe'
+        end
       end
-    end
 
-    let (:leading_whitespace) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10| src=10.0.0.192 dst=12.121.122.82 spt=1232" }
-    it "should strip leading whitespace from the message" do
-      decode_one(subject, leading_whitespace) do |e|
-        validate(e)
+      let (:pipes_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this|has an pipe'}
+      it "should be OK with not escaped pipes in the message" do
+        decode_one(subject, pipes_in_message) do |e|
+          insist { e.get("moo") } == 'this|has an pipe'
+        end
       end
-    end
 
-    let (:escaped_pipes) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this\|has an escaped pipe' }
-    it "should be OK with escaped pipes in the message" do
-      decode_one(subject, escaped_pipes) do |e|
-        insist { e.get("moo") } == 'this\|has an escaped pipe'
+      # while we may see these in practice, equals MUST be escaped in the extensions per the spec.
+      let (:equal_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this =has = equals\='}
+      it "should be OK with equal in the message" do
+        decode_one(subject, equal_in_message) do |e|
+          insist { e.get("moo") } == 'this =has = equals='
+        end
       end
-    end
 
-    let (:pipes_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this|has an pipe'}
-    it "should be OK with not escaped pipes in the message" do
-      decode_one(subject, pipes_in_message) do |e|
-        insist { e.get("moo") } == 'this|has an pipe'
+      let(:malformed_unescaped_equals_in_extension_value) { %q{CEF:0|FooBar|Web Gateway|1.2.3.45.67|200|Success|2|rt=Sep 07 2018 14:50:39 cat=Access Log dst=1.1.1.1 dhost=foo.example.com suser=redacted src=2.2.2.2 requestMethod=POST request='https://foo.example.com/bar/bingo/1' requestClientApplication='Foo-Bar/2018.1.7; Email:user@example.com; Guid:test=' cs1= cs1Label=Foo Bar} }
+      it 'should split correctly' do
+        decode_one(subject, malformed_unescaped_equals_in_extension_value) do |event|
+          expect(event.get(ecs_select[disabled:"cefVersion",        v1:"[cef][version]"])).to eq('0')
+          expect(event.get(ecs_select[disabled:"deviceVendor",      v1:"[observer][vendor]"])).to eq('FooBar')
+          expect(event.get(ecs_select[disabled:"deviceProduct",     v1:"[observer][product]"])).to eq('Web Gateway')
+          expect(event.get(ecs_select[disabled:"deviceVersion",     v1:"[observer][version]"])).to eq('1.2.3.45.67')
+          expect(event.get(ecs_select[disabled:"deviceEventClassId",v1:"[event][code]"])).to eq('200')
+          expect(event.get(ecs_select[disabled:"name",              v1:"[cef][name]"])).to eq('Success')
+          expect(event.get(ecs_select[disabled:"severity",          v1:"[event][severity]"])).to eq('2')
+
+          # extension key/value pairs
+          if ecs_compatibility == :disabled
+            expect(event.get('deviceReceiptTime')).to eq('Sep 07 2018 14:50:39')
+          else
+            expect(event.get('[@timestamp]').to_s).to eq('2018-09-07T14:50:39.000Z')
+          end
+          expect(event.get(ecs_select[disabled:'deviceEventCategory',     v1:'[cef][category]'])).to eq('Access Log')
+          expect(event.get(ecs_select[disabled:'deviceVersion',           v1:'[observer][version]'])).to eq('1.2.3.45.67')
+          expect(event.get(ecs_select[disabled:'destinationAddress',      v1:'[destination][ip]'])).to eq('1.1.1.1')
+          expect(event.get(ecs_select[disabled:'destinationHostName',     v1:'[destination][domain]'])).to eq('foo.example.com')
+          expect(event.get(ecs_select[disabled:'sourceUserName',          v1:'[source][user][name]'])).to eq('redacted')
+          expect(event.get(ecs_select[disabled:'sourceAddress',           v1:'[source][ip]'])).to eq('2.2.2.2')
+          expect(event.get(ecs_select[disabled:'requestMethod',           v1:'[http][request][method]'])).to eq('POST')
+          expect(event.get(ecs_select[disabled:'requestUrl',              v1:'[url][original]'])).to eq(%q{'https://foo.example.com/bar/bingo/1'})
+          # Although the value for `requestClientApplication` contains an illegal unquoted equals sign, the sequence
+          # preceeding the unescaped-equals isn't shaped like a key, so we allow it to be a part of the value.
+          expect(event.get(ecs_select[disabled:'requestClientApplication',v1:'[user_agent][original]'])).to eq(%q{'Foo-Bar/2018.1.7; Email:user@example.com; Guid:test='})
+          expect(event.get(ecs_select[disabled:'deviceCustomString1Label',v1:'[cef][device_custom_string_1][label]'])).to eq('Foo Bar')
+          expect(event.get(ecs_select[disabled:'deviceCustomString1',     v1:'[cef][device_custom_string_1][value]'])).to eq('')
+        end
       end
-    end
 
-    # while we may see these in practice, equals MUST be escaped in the extensions per the spec.
-    let (:equal_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this =has = equals\='}
-    it "should be OK with equal in the message" do
-      decode_one(subject, equal_in_message) do |e|
-        insist { e.get("moo") } == 'this =has = equals='
+      context('escaped-equals and unescaped-spaces in the extension values') do
+        let(:query_string) { 'key1=value1&key2=value3 aa.bc&key3=value4'}
+        let(:escaped_query_string) { query_string.gsub('=','\\=') }
+        let(:cef_message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|go=start now query_string=#{escaped_query_string} final=done" }
+
+        it 'captures the extension values correctly' do
+          event = decode_one(subject, cef_message)
+
+          expect(event.get('go')).to eq('start now')
+          expect(event.get('query_string')).to eq(query_string)
+          expect(event.get('final')).to eq('done')
+        end
       end
-    end
 
-    let(:malformed_unescaped_equals_in_extension_value) { %q{CEF:0|FooBar|Web Gateway|1.2.3.45.67|200|Success|2|rt=Sep 07 2018 14:50:39 cat=Access Log dst=1.1.1.1 dhost=foo.example.com suser=redacted src=2.2.2.2 requestMethod=POST request='https://foo.example.com/bar/bingo/1' requestClientApplication='Foo-Bar/2018.1.7; Email:user@example.com; Guid:test=' cs1= cs1Label=Foo Bar} }
-    it 'should split correctly' do
-      decode_one(subject, malformed_unescaped_equals_in_extension_value) do |event|
-        expect(event.get('cefVersion')).to eq('0')
-        expect(event.get('deviceVendor')).to eq('FooBar')
-        expect(event.get('deviceProduct')).to eq('Web Gateway')
-        expect(event.get('deviceVersion')).to eq('1.2.3.45.67')
-        expect(event.get('deviceEventClassId')).to eq('200')
-        expect(event.get('name')).to eq('Success')
-        expect(event.get('severity')).to eq('2')
-
-        # extension key/value pairs
-        expect(event.get('deviceReceiptTime')).to eq('Sep 07 2018 14:50:39')
-        expect(event.get('deviceEventCategory')).to eq('Access Log')
-        expect(event.get('deviceVersion')).to eq('1.2.3.45.67')
-        expect(event.get('destinationAddress')).to eq('1.1.1.1')
-        expect(event.get('destinationHostName')).to eq('foo.example.com')
-        expect(event.get('sourceUserName')).to eq('redacted')
-        expect(event.get('sourceAddress')).to eq('2.2.2.2')
-        expect(event.get('requestMethod')).to eq('POST')
-        expect(event.get('requestUrl')).to eq(%q{'https://foo.example.com/bar/bingo/1'})
-        # Although the value for `requestClientApplication` contains an illegal unquoted equals sign, the sequence
-        # preceeding the unescaped-equals isn't shaped like a key, so we allow it to be a part of the value.
-        expect(event.get('requestClientApplication')).to eq(%q{'Foo-Bar/2018.1.7; Email:user@example.com; Guid:test='})
-        expect(event.get('deviceCustomString1Label')).to eq('Foo Bar')
-        expect(event.get('deviceCustomString1')).to eq('')
+      let (:escaped_backslash_in_header) {'CEF:0|secu\\\\rity|threat\\\\manager|1.\\\\0|10\\\\0|tro\\\\jan successfully stopped|\\\\10|'}
+      it "should be OK with escaped backslash in the headers" do
+        decode_one(subject, escaped_backslash_in_header) do |e|
+          insist { e.get(ecs_select[disabled:"cefVersion",        v1:"[cef][version]"]) } == '0'
+          insist { e.get(ecs_select[disabled:"deviceVendor",      v1:"[observer][vendor]"]) } == 'secu\\rity'
+          insist { e.get(ecs_select[disabled:"deviceProduct",     v1:"[observer][product]"]) } == 'threat\\manager'
+          insist { e.get(ecs_select[disabled:"deviceVersion",     v1:"[observer][version]"]) } == '1.\\0'
+          insist { e.get(ecs_select[disabled:"deviceEventClassId",v1:"[event][code]"]) } == '10\\0'
+          insist { e.get(ecs_select[disabled:"name",              v1:"[cef][name]"]) } == 'tro\\jan successfully stopped'
+          insist { e.get(ecs_select[disabled:"severity",          v1:"[event][severity]"]) } == '\\10'
+        end
       end
-    end
 
-    context('escaped-equals and unescaped-spaces in the extension values') do
-      let(:query_string) { 'key1=value1&key2=value3 aa.bc&key3=value4'}
-      let(:escaped_query_string) { query_string.gsub('=','\\=') }
-      let(:cef_message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|go=start now query_string=#{escaped_query_string} final=done" }
-
-      it 'captures the extension values correctly' do
-        event = decode_one(subject, cef_message)
-
-        expect(event.get('go')).to eq('start now')
-        expect(event.get('query_string')).to eq(query_string)
-        expect(event.get('final')).to eq('done')
+      let (:escaped_backslash_in_header_edge_case) {'CEF:0|security\\\\\\||threatmanager\\\\|1.0|100|trojan successfully stopped|10|'}
+      it "should be OK with escaped backslash in the headers (edge case: escaped slash in front of pipe)" do
+        decode_one(subject, escaped_backslash_in_header_edge_case) do |e|
+          validate(e)
+          insist { e.get(ecs_select[disabled:"deviceVendor", v1:"[observer][vendor]"]) } == 'security\\|'
+          insist { e.get(ecs_select[disabled:"deviceProduct",v1:"[observer][product]"]) } == 'threatmanager\\'
+        end
       end
-    end
 
-    let (:escaped_backslash_in_header) {'CEF:0|secu\\\\rity|threat\\\\manager|1.\\\\0|10\\\\0|tro\\\\jan successfully stopped|\\\\10|'}
-    it "should be OK with escaped backslash in the headers" do
-      decode_one(subject, escaped_backslash_in_header) do |e|
-        insist { e.get("cefVersion") } == '0'
-        insist { e.get("deviceVendor") } == 'secu\\rity'
-        insist { e.get("deviceProduct") } == 'threat\\manager'
-        insist { e.get("deviceVersion") } == '1.\\0'
-        insist { e.get("deviceEventClassId") } == '10\\0'
-        insist { e.get("name") } == 'tro\\jan successfully stopped'
-        insist { e.get("severity") } == '\\10'
+      let (:escaped_pipes_in_header) {'CEF:0|secu\\|rity|threatmanager\\||1.\\|0|10\\|0|tro\\|jan successfully stopped|\\|10|'}
+      it "should be OK with escaped pipes in the headers" do
+        decode_one(subject, escaped_pipes_in_header) do |e|
+          insist { e.get(ecs_select[disabled:"cefVersion",        v1:"[cef][version]"]) } == '0'
+          insist { e.get(ecs_select[disabled:"deviceVendor",      v1:"[observer][vendor]"]) } == 'secu|rity'
+          insist { e.get(ecs_select[disabled:"deviceProduct",     v1:"[observer][product]"]) } == 'threatmanager|'
+          insist { e.get(ecs_select[disabled:"deviceVersion",     v1:"[observer][version]"]) } == '1.|0'
+          insist { e.get(ecs_select[disabled:"deviceEventClassId",v1:"[event][code]"]) } == '10|0'
+          insist { e.get(ecs_select[disabled:"name",              v1:"[cef][name]"]) } == 'tro|jan successfully stopped'
+          insist { e.get(ecs_select[disabled:"severity",          v1:"[event][severity]"]) } == '|10'
+        end
       end
-    end
 
-    let (:escaped_backslash_in_header_edge_case) {'CEF:0|security\\\\\\||threatmanager\\\\|1.0|100|trojan successfully stopped|10|'}
-    it "should be OK with escaped backslash in the headers (edge case: escaped slash in front of pipe)" do
-      decode_one(subject, escaped_backslash_in_header_edge_case) do |e|
-        validate(e)
-        insist { e.get("deviceVendor") } == 'security\\|'
-        insist { e.get("deviceProduct") } == 'threatmanager\\'
+      let (:backslash_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this \\has \\ backslashs\\'}
+      it "should be OK with backslashs in the message" do
+        decode_one(subject, backslash_in_message) do |e|
+          insist { e.get("moo") } == 'this \\has \\ backslashs\\'
+        end
       end
-    end
 
-    let (:escaped_pipes_in_header) {'CEF:0|secu\\|rity|threatmanager\\||1.\\|0|10\\|0|tro\\|jan successfully stopped|\\|10|'}
-    it "should be OK with escaped pipes in the headers" do
-      decode_one(subject, escaped_pipes_in_header) do |e|
-        insist { e.get("cefVersion") } == '0'
-        insist { e.get("deviceVendor") } == 'secu|rity'
-        insist { e.get("deviceProduct") } == 'threatmanager|'
-        insist { e.get("deviceVersion") } == '1.|0'
-        insist { e.get("deviceEventClassId") } == '10|0'
-        insist { e.get("name") } == 'tro|jan successfully stopped'
-        insist { e.get("severity") } == '|10'
+      let (:equal_in_header) {'CEF:0|security|threatmanager=equal|1.0|100|trojan successfully stopped|10|'}
+      it "should be OK with equal in the headers" do
+        decode_one(subject, equal_in_header) do |e|
+          validate(e)
+          insist { e.get(ecs_select[disabled:"deviceProduct",v1:"[observer][product]"]) } == "threatmanager=equal"
+        end
       end
-    end
 
-    let (:backslash_in_message) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|moo=this \\has \\ backslashs\\'}
-    it "should be OK with backslashs in the message" do
-      decode_one(subject, backslash_in_message) do |e|
-        insist { e.get("moo") } == 'this \\has \\ backslashs\\'
+      let (:spaces_in_between_keys) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10| src=10.0.0.192  dst=12.121.122.82  spt=1232'}
+      it "should be OK to have one or more spaces between keys" do
+        decode_one(subject, spaces_in_between_keys) do |e|
+          validate(e)
+          insist { e.get(ecs_select[disabled:"sourceAddress",v1:"[source][ip]"]) } == "10.0.0.192"
+          insist { e.get(ecs_select[disabled:"destinationAddress",v1:"[destination][ip]"]) } == "12.121.122.82"
+          insist { e.get(ecs_select[disabled:"sourcePort",v1:"[source][port]"]) } == "1232"
+        end
       end
-    end
 
-    let (:equal_in_header) {'CEF:0|security|threatmanager=equal|1.0|100|trojan successfully stopped|10|'}
-    it "should be OK with equal in the headers" do
-      decode_one(subject, equal_in_header) do |e|
-        validate(e)
-        insist { e.get("deviceProduct") } == "threatmanager=equal"
+      let (:dots_in_keys) {'CEF:0|Vendor|Device|Version|13|my message|5|dvchost=loghost cat=traffic deviceSeverity=notice ad.nn=TEST src=192.168.0.1 destinationPort=53'}
+      it "should be OK with dots in keys" do
+        decode_one(subject, dots_in_keys) do |e|
+          insist { e.get(ecs_select[disabled:"deviceHostName",v1:"[observer][name]"]) } == "loghost"
+          insist { e.get("ad.nn") } == 'TEST'
+          insist { e.get(ecs_select[disabled:"sourceAddress",v1:"[source][ip]"]) } == '192.168.0.1'
+          insist { e.get(ecs_select[disabled:"destinationPort",v1:"[destination][port]"]) } == '53'
+        end
       end
-    end
 
-    let (:spaces_in_between_keys) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10| src=10.0.0.192  dst=12.121.122.82  spt=1232'}
-    it "should be OK to have one or more spaces between keys" do
-      decode_one(subject, spaces_in_between_keys) do |e|
-        validate(e)
-        insist { e.get("sourceAddress") } == "10.0.0.192"
-        insist { e.get("destinationAddress") } == "12.121.122.82"
-        insist { e.get("sourcePort") } == "1232"
+      let (:allow_spaces_in_values) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82  spt=1232 dproc=InternetExplorer x.x.x.x'}
+      it "should be OK to have one or more spaces in values" do
+        decode_one(subject, allow_spaces_in_values) do |e|
+          validate(e)
+          insist { e.get(ecs_select[disabled:"sourceAddress",v1:"[source][ip]"]) } == "10.0.0.192"
+          insist { e.get(ecs_select[disabled:"destinationAddress",v1:"[destination][ip]"]) } == "12.121.122.82"
+          insist { e.get(ecs_select[disabled:"sourcePort",v1:"[source][port]"]) } == "1232"
+          insist { e.get(ecs_select[disabled:"destinationProcessName",v1:"[destination][process][name]"]) } == "InternetExplorer x.x.x.x"
+        end
       end
-    end
 
-    let (:dots_in_keys) {'CEF:0|Vendor|Device|Version|13|my message|5|dvchost=loghost cat=traffic deviceSeverity=notice ad.nn=TEST src=192.168.0.1 destinationPort=53'}
-    it "should be OK with dots in keys" do
-      decode_one(subject, dots_in_keys) do |e|
-        insist { e.get("deviceHostName") } == "loghost"
-        insist { e.get("ad.nn") } == 'TEST'
-        insist { e.get("sourceAddress") } == '192.168.0.1'
-        insist { e.get("destinationPort") } == '53'
+      let (:preserve_additional_fields_with_dot_notations) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 additional.dotfieldName=new_value ad.Authentification=MICROSOFT_AUTHENTICATION_PACKAGE_V1_0 ad.Error_,Code=3221225578 dst=12.121.122.82 ad.field[0]=field0 ad.name[1]=new_name'}
+      it "should keep ad.fields" do
+        decode_one(subject, preserve_additional_fields_with_dot_notations) do |e|
+          validate(e)
+          insist { e.get(ecs_select[disabled:"sourceAddress",v1:"[source][ip]"]) } == "10.0.0.192"
+          insist { e.get(ecs_select[disabled:"destinationAddress",v1:"[destination][ip]"]) } == "12.121.122.82"
+          insist { e.get("[ad.field][0]") } == "field0"
+          insist { e.get("[ad.name][1]") } == "new_name"
+          insist { e.get("ad.Authentification") } == "MICROSOFT_AUTHENTICATION_PACKAGE_V1_0"
+          insist { e.get('ad.Error_,Code') } == "3221225578"
+          insist { e.get("additional.dotfieldName") } == "new_value"
+        end
       end
-    end
 
-    let (:allow_spaces_in_values) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82  spt=1232 dproc=InternetExplorer x.x.x.x'}
-    it "should be OK to have one or more spaces in values" do
-      decode_one(subject, allow_spaces_in_values) do |e|
-        validate(e)
-        insist { e.get("sourceAddress") } == "10.0.0.192"
-        insist { e.get("destinationAddress") } == "12.121.122.82"
-        insist { e.get("sourcePort") } == "1232"
-        insist { e.get("destinationProcessName") } == "InternetExplorer x.x.x.x"
+      let(:preserve_complex_multiple_dot_notation_in_extension_fields) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 additional.dotfieldName=new_value ad.Authentification=MICROSOFT_AUTHENTICATION_PACKAGE_V1_0 ad.Error_,Code=3221225578 dst=12.121.122.82 ad.field[0]=field0 ad.foo.name[1]=new_name' }
+      it "should keep ad.fields" do
+        decode_one(subject, preserve_complex_multiple_dot_notation_in_extension_fields) do |e|
+          validate(e)
+          insist { e.get(ecs_select[disabled:"sourceAddress",v1:"[source][ip]"]) } == "10.0.0.192"
+          insist { e.get(ecs_select[disabled:"destinationAddress",v1:"[destination][ip]"]) } == "12.121.122.82"
+          insist { e.get("[ad.field][0]") } == "field0"
+          insist { e.get("[ad.foo.name][1]") } == "new_name"
+          insist { e.get("ad.Authentification") } == "MICROSOFT_AUTHENTICATION_PACKAGE_V1_0"
+          insist { e.get('ad.Error_,Code') } == "3221225578"
+          insist { e.get("additional.dotfieldName") } == "new_value"
+        end
       end
-    end
 
-    let (:preserve_additional_fields_with_dot_notations) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 additional.dotfieldName=new_value ad.Authentification=MICROSOFT_AUTHENTICATION_PACKAGE_V1_0 ad.Error_,Code=3221225578 dst=12.121.122.82 ad.field[0]=field0 ad.name[1]=new_name'}
-    it "should keep ad.fields" do
-      decode_one(subject, preserve_additional_fields_with_dot_notations) do |e|
-        validate(e)
-        insist { e.get("sourceAddress") } == "10.0.0.192"
-        insist { e.get("destinationAddress") } == "12.121.122.82"
-        insist { e.get("[ad.field][0]") } == "field0"
-        insist { e.get("[ad.name][1]") } == "new_name"
-        insist { e.get("ad.Authentification") } == "MICROSOFT_AUTHENTICATION_PACKAGE_V1_0"
-        insist { e.get('ad.Error_,Code') } == "3221225578"
-        insist { e.get("additional.dotfieldName") } == "new_value"
+      let (:preserve_random_values_key_value_pairs_alongside_with_additional_fields) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 cs4=401 random.user Admin 0 23041A10181C0000  23041810181C0000  /CN\=random.user/OU\=User Login End-Entity  /CN\=TEST/OU\=Login CA TEST 34 additional.dotfieldName=new_value ad.Authentification=MICROSOFT_AUTHENTICATION_PACKAGE_V1_0 ad.Error_,Code=3221225578 dst=12.121.122.82 ad.field[0]=field0 ad.name[1]=new_name'}
+      it "should correctly parse random values even with additional fields in message" do
+        decode_one(subject, preserve_random_values_key_value_pairs_alongside_with_additional_fields) do |e|
+          validate(e)
+          insist { e.get(ecs_select[disabled:"sourceAddress",v1:"[source][ip]"]) } == "10.0.0.192"
+          insist { e.get(ecs_select[disabled:"destinationAddress",v1:"[destination][ip]"]) } == "12.121.122.82"
+          insist { e.get("[ad.field][0]") } == "field0"
+          insist { e.get("[ad.name][1]") } == "new_name"
+          insist { e.get("ad.Authentification") } == "MICROSOFT_AUTHENTICATION_PACKAGE_V1_0"
+          insist { e.get("ad.Error_,Code") } == "3221225578"
+          insist { e.get("additional.dotfieldName") } == "new_value"
+          insist { e.get(ecs_select[disabled:"deviceCustomString4",v1:"[cef][device_custom_string_4][value]"]) } == "401 random.user Admin 0 23041A10181C0000  23041810181C0000  /CN\=random.user/OU\=User Login End-Entity  /CN\=TEST/OU\=Login CA TEST 34"
+        end
       end
-    end
 
-    let(:preserve_complex_multiple_dot_notation_in_extension_fields) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 additional.dotfieldName=new_value ad.Authentification=MICROSOFT_AUTHENTICATION_PACKAGE_V1_0 ad.Error_,Code=3221225578 dst=12.121.122.82 ad.field[0]=field0 ad.foo.name[1]=new_name' }
-    it "should keep ad.fields" do
-      decode_one(subject, preserve_complex_multiple_dot_notation_in_extension_fields) do |e|
-        validate(e)
-        insist { e.get("sourceAddress") } == "10.0.0.192"
-        insist { e.get("destinationAddress") } == "12.121.122.82"
-        insist { e.get("[ad.field][0]") } == "field0"
-        insist { e.get("[ad.foo.name][1]") } == "new_name"
-        insist { e.get("ad.Authentification") } == "MICROSOFT_AUTHENTICATION_PACKAGE_V1_0"
-        insist { e.get('ad.Error_,Code') } == "3221225578"
-        insist { e.get("additional.dotfieldName") } == "new_value"
+      let (:preserve_unmatched_key_mappings) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 new_key_by_device=new_values here'}
+      it "should preserve unmatched key mappings" do
+        decode_one(subject, preserve_unmatched_key_mappings) do |e|
+          validate(e)
+          insist { e.get(ecs_select[disabled:"sourceAddress",v1:"[source][ip]"]) } == "10.0.0.192"
+          insist { e.get(ecs_select[disabled:"destinationAddress",v1:"[destination][ip]"]) } == "12.121.122.82"
+          insist { e.get("new_key_by_device") } == "new_values here"
+        end
       end
-    end
 
-    let (:preserve_random_values_key_value_pairs_alongside_with_additional_fields) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 cs4=401 random.user Admin 0 23041A10181C0000  23041810181C0000  /CN\=random.user/OU\=User Login End-Entity  /CN\=TEST/OU\=Login CA TEST 34 additional.dotfieldName=new_value ad.Authentification=MICROSOFT_AUTHENTICATION_PACKAGE_V1_0 ad.Error_,Code=3221225578 dst=12.121.122.82 ad.field[0]=field0 ad.name[1]=new_name'}
-    it "should correctly parse random values even with additional fields in message" do
-      decode_one(subject, preserve_random_values_key_value_pairs_alongside_with_additional_fields) do |e|
-        validate(e)
-        insist { e.get("sourceAddress") } == "10.0.0.192"
-        insist { e.get("destinationAddress") } == "12.121.122.82"
-        insist { e.get("[ad.field][0]") } == "field0"
-        insist { e.get("[ad.name][1]") } == "new_name"
-        insist { e.get("ad.Authentification") } == "MICROSOFT_AUTHENTICATION_PACKAGE_V1_0"
-        insist { e.get("ad.Error_,Code") } == "3221225578"
-        insist { e.get("additional.dotfieldName") } == "new_value"
-        insist { e.get("deviceCustomString4") } == "401 random.user Admin 0 23041A10181C0000  23041810181C0000  /CN\=random.user/OU\=User Login End-Entity  /CN\=TEST/OU\=Login CA TEST 34"
+      let (:translate_abbreviated_cef_fields) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 proto=TCP shost=source.host.name dhost=destination.host.name spt=11024 dpt=9200 outcome=Success amac=00:80:48:1c:24:91'}
+      it "should translate most known abbreviated CEF field names" do
+        decode_one(subject, translate_abbreviated_cef_fields) do |e|
+          validate(e)
+          insist { e.get(ecs_select[disabled:"sourceAddress",      v1:"[source][ip]"]) } == "10.0.0.192"
+          insist { e.get(ecs_select[disabled:"destinationAddress", v1:"[destination][ip]"]) } == "12.121.122.82"
+          insist { e.get(ecs_select[disabled:"transportProtocol",  v1:"[network][transport]"]) } == "TCP"
+          insist { e.get(ecs_select[disabled:"sourceHostName",     v1:"[source][domain]"]) } == "source.host.name"
+          insist { e.get(ecs_select[disabled:"destinationHostName",v1:"[destination][domain]"]) } == "destination.host.name"
+          insist { e.get(ecs_select[disabled:"sourcePort",         v1:"[source][port]"]) } == "11024"
+          insist { e.get(ecs_select[disabled:"destinationPort",    v1:"[destination][port]"]) } == "9200"
+          insist { e.get(ecs_select[disabled:"eventOutcome",       v1:"[event][outcome]"]) } == "Success"
+          insist { e.get(ecs_select[disabled:"agentMacAddress",    v1:"[agent][mac]"])} == "00:80:48:1c:24:91"
+        end
       end
-    end
 
-    let (:preserve_unmatched_key_mappings) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 new_key_by_device=new_values here'}
-    it "should preserve unmatched key mappings" do
-      decode_one(subject, preserve_unmatched_key_mappings) do |e|
-        validate(e)
-        insist { e.get("sourceAddress") } == "10.0.0.192"
-        insist { e.get("destinationAddress") } == "12.121.122.82"
-        insist { e.get("new_key_by_device") } == "new_values here"
+      let (:syslog) { "Syslogdate Sysloghost CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+      it "Should detect headers before CEF starts" do
+        decode_one(subject, syslog) do |e|
+          validate(e)
+          insist { e.get(ecs_select[disabled:'syslog',v1:'[log][syslog][header]']) } == 'Syslogdate Sysloghost'
+        end
       end
-    end
 
-    let (:translate_abbreviated_cef_fields) {'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 proto=TCP shost=source.host.name dhost=destination.host.name spt=11024 dpt=9200 outcome=Success amac=00:80:48:1c:24:91'}
-    it "should translate most known abbreviated CEF field names" do
-      decode_one(subject, translate_abbreviated_cef_fields) do |e|
-        validate(e)
-        insist { e.get("sourceAddress") } == "10.0.0.192"
-        insist { e.get("destinationAddress") } == "12.121.122.82"
-        insist { e.get("transportProtocol") } == "TCP"
-        insist { e.get("sourceHostName") } == "source.host.name"
-        insist { e.get("destinationHostName") } == "destination.host.name"
-        insist { e.get("sourcePort") } == "11024"
-        insist { e.get("destinationPort") } == "9200"
-        insist { e.get("eventOutcome") } == "Success"
-        insist { e.get("agentMacAddress")} == "00:80:48:1c:24:91"
-      end
-    end
+      context 'with UTF-8 message' do
+        let(:message) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=192.168.1.11 target=aaaaaああああaaaa msg=Description Omitted' }
 
-    let (:syslog) { "Syslogdate Sysloghost CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
-    it "Should detect headers before CEF starts" do
-      decode_one(subject, syslog) do |e|
-        validate(e)
-        insist { e.get('syslog') } == 'Syslogdate Sysloghost'
-      end
-    end
-
-    context 'with UTF-8 message' do
-      let(:message) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=192.168.1.11 target=aaaaaああああaaaa msg=Description Omitted' }
-
-      # since this spec is encoded UTF-8, the literal strings it contains are encoded with UTF-8,
-      # but codecs in Logstash tend to receive their input as BINARY (or: ASCII-8BIT); ensure that
-      # we can handle either without losing the UTF-8 characters from the higher planes.
-      %w(
-        BINARY
-        UTF-8
-      ).each do |external_encoding|
-        context "externally encoded as #{external_encoding}" do
-          let(:message) { super().force_encoding(external_encoding) }
-          it 'should keep the higher-plane characters' do
-            decode_one(subject, message.dup) do |event|
-              validate(event)
-              insist { event.get("target") } == "aaaaaああああaaaa"
-              insist { event.get("target").encoding } == Encoding::UTF_8
+        # since this spec is encoded UTF-8, the literal strings it contains are encoded with UTF-8,
+        # but codecs in Logstash tend to receive their input as BINARY (or: ASCII-8BIT); ensure that
+        # we can handle either without losing the UTF-8 characters from the higher planes.
+        %w(
+          BINARY
+          UTF-8
+        ).each do |external_encoding|
+          context "externally encoded as #{external_encoding}" do
+            let(:message) { super().force_encoding(external_encoding) }
+            it 'should keep the higher-plane characters' do
+              decode_one(subject, message.dup) do |event|
+                validate(event)
+                insist { event.get("target") } == "aaaaaああああaaaa"
+                insist { event.get("target").encoding } == Encoding::UTF_8
+              end
             end
           end
         end
       end
-    end
 
-    context 'non-UTF-8 message' do
-      let(:message) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=192.168.1.11 target=aaaaaああああaaaa msg=Description Omitted'.encode('SHIFT_JIS') }
-      it 'should emit message unparsed with _cefparsefailure tag' do
-        decode_one(subject, message.dup) do |event|
-          insist { event.get("message").bytes.to_a } == message.bytes.to_a
-          insist { event.get("tags") } == ['_cefparsefailure']
+      context 'non-UTF-8 message' do
+        let(:logger_stub) { double('Logger').as_null_object }
+        before(:each) do
+          allow_any_instance_of(described_class).to receive(:logger).and_return(logger_stub)
+        end
+        let(:message) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=192.168.1.11 target=aaaaaああああaaaa msg=Description Omitted'.encode('SHIFT_JIS') }
+        it 'should emit message unparsed with _cefparsefailure tag' do
+          decode_one(subject, message.dup) do |event|
+            insist { event.get("message").bytes.to_a } == message.bytes.to_a
+            insist { event.get("tags") } == ['_cefparsefailure']
+          end
+          expect(logger_stub).to have_received(:error).with(/Failed to decode CEF payload/, any_args)
         end
       end
-    end
 
-    context "with raw_data_field set" do
-      subject(:codec) { LogStash::Codecs::CEF.new("raw_data_field" => "message_raw") }
+      context "with raw_data_field set" do
+        subject(:codec) { LogStash::Codecs::CEF.new("raw_data_field" => "message_raw") }
 
-      it "should return the raw message in field message_raw" do
-        decode_one(subject, message.dup) do |e|
-          validate(e)
-          insist { e.get("message_raw") } == message
+        it "should return the raw message in field message_raw" do
+          decode_one(subject, message.dup) do |e|
+            validate(e)
+            insist { e.get("message_raw") } == message
+          end
         end
       end
     end
@@ -704,25 +807,46 @@ describe LogStash::Codecs::CEF do
 
     let(:results)   { [] }
 
-    it "should return an equal event if encoded and decoded again" do
-      codec.on_event{|data, newdata| results << newdata}
-      codec.vendor = "%{deviceVendor}"
-      codec.product = "%{deviceProduct}"
-      codec.version = "%{deviceVersion}"
-      codec.signature = "%{deviceEventClassId}"
-      codec.name = "%{name}"
-      codec.severity = "%{severity}"
-      codec.fields = [ "foo" ]
-      event = LogStash::Event.new("deviceVendor" => "vendor", "deviceProduct" => "product", "deviceVersion" => "2.0", "deviceEventClassId" => "signature", "name" => "name", "severity" => "1", "foo" => "bar")
-      codec.encode(event)
-      codec.decode(results.first) do |e|
-        expect(e.get('deviceVendor')).to be == event.get('deviceVendor')
-        expect(e.get('deviceProduct')).to be == event.get('deviceProduct')
-        expect(e.get('deviceVersion')).to be == event.get('deviceVersion')
-        expect(e.get('deviceEventClassId')).to be == event.get('deviceEventClassId')
-        expect(e.get('name')).to be == event.get('name')
-        expect(e.get('severity')).to be == event.get('severity')
-        expect(e.get('foo')).to be == event.get('foo')
+    ecs_compatibility_matrix(:disabled,:v1) do |ecs_select|
+      before(:each) do
+        allow_any_instance_of(described_class).to receive(:ecs_compatibility).and_return(ecs_compatibility)
+      end
+
+      let(:vendor_field)    { ecs_select[disabled:'deviceVendor',       v1:'[observer][vendor]'] }
+      let(:product_field)   { ecs_select[disabled:'deviceProduct',      v1:'[observer][product]']}
+      let(:version_field)   { ecs_select[disabled:'deviceVersion',      v1:'[observer][version]']}
+      let(:signature_field) { ecs_select[disabled:'deviceEventClassId', v1:'[event][code]']}
+      let(:name_field)      { ecs_select[disabled:'name',               v1:'[cef][name]']}
+      let(:severity_field)  { ecs_select[disabled:'severity',           v1:'[event][severity]']}
+
+      it "should return an equal event if encoded and decoded again" do
+        codec.on_event{|data, newdata| results << newdata}
+        codec.vendor = "%{" + vendor_field + "}"
+        codec.product = "%{" + product_field + "}"
+        codec.version = "%{" + version_field + "}"
+        codec.signature = "%{" + signature_field + "}"
+        codec.name = "%{" + name_field + "}"
+        codec.severity = "%{" + severity_field + "}"
+        codec.fields = [ "foo" ]
+        event = LogStash::Event.new.tap do |e|
+          e.set(vendor_field, "vendor")
+          e.set(product_field, "product")
+          e.set(version_field, "2.0")
+          e.set(signature_field, "signature")
+          e.set(name_field, "name")
+          e.set(severity_field, "1")
+          e.set("foo", "bar")
+        end
+        codec.encode(event)
+        codec.decode(results.first) do |e|
+          expect(e.get(vendor_field)).to be == event.get(vendor_field)
+          expect(e.get(product_field)).to be == event.get(product_field)
+          expect(e.get(version_field)).to be == event.get(version_field)
+          expect(e.get(signature_field)).to be == event.get(signature_field)
+          expect(e.get(name_field)).to be == event.get(name_field)
+          expect(e.get(severity_field)).to be == event.get(severity_field)
+          expect(e.get('foo')).to be == event.get('foo')
+        end
       end
     end
   end
