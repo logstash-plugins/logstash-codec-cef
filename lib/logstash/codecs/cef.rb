@@ -316,16 +316,20 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     #                                 in decoding mode without ECS, field name will be used as-provided.
     #                                 in encoding mode without ECS when provided to `fields` and `reverse_mapping => false`,
     #                                 field name will be used as-provided.
-    def initialize(name, key: name, ecs_field: name, legacy:nil)
+    # @param priority [Integer] (optional): when multiple fields resolve to the same ECS field name, the field with the
+    #                                 highest `prioriry` will be used by the encoder.
+    def initialize(name, key: name, ecs_field: name, legacy:nil, priority:0)
       @name = name
       @key = key
       @ecs_field = ecs_field
       @legacy = legacy
+      @priority = priority
     end
     attr_reader :name
     attr_reader :key
     attr_reader :ecs_field
     attr_reader :legacy
+    attr_reader :priority
   end
 
   def generate_mappings!
@@ -333,7 +337,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     decode_mapping = Hash.new
     [
       CEFField.new("agentAddress",                    key: "agt",       ecs_field: "[agent][ip]"),
-      CEFField.new("agentDnsDomain",                                    ecs_field: "[cef][agent][registered_domain]"),
+      CEFField.new("agentDnsDomain",                                    ecs_field: "[cef][agent][registered_domain]", priority: 10),
       CEFField.new("agentHostName",                   key: "ahost",     ecs_field: "[agent][name]"),
       CEFField.new("agentId",                         key: "aid",       ecs_field: "[agent][id]"),
       CEFField.new("agentMacAddress",                 key: "amac",      ecs_field: "[agent][mac]"),
@@ -355,7 +359,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       CEFField.new("customerExternalID",                                ecs_field: "[organization][id]"),
       CEFField.new("customerURI",                                       ecs_field: "[organization][name]"),
       CEFField.new("destinationAddress",              key: "dst",       ecs_field: "[destination][ip]"),
-      CEFField.new("destinationDnsDomain",                              ecs_field: "[destination][registered_domain]"),
+      CEFField.new("destinationDnsDomain",                              ecs_field: "[destination][registered_domain]", priority: 10),
       CEFField.new("destinationGeoLatitude",          key: "dlat",      ecs_field: "[destination][geo][location][lat]", legacy: "destinationLatitude"),
       CEFField.new("destinationGeoLongitude",         key: "dlong",     ecs_field: "[destination][geo][location][lon]", legacy: "destinationLongitude"),
       CEFField.new("destinationHostName",             key: "dhost",     ecs_field: "[destination][domain]"),
@@ -411,7 +415,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       CEFField.new("deviceCustomString6",             key: "cs6",       ecs_field: "[cef][device_custom_string_6][value]"),
       CEFField.new("deviceCustomString6Label",        key: "cs6Label",  ecs_field: "[cef][device_custom_string_6][label]"),
       CEFField.new("deviceDirection",                                   ecs_field: "[network][direction]"),
-      CEFField.new("deviceDnsDomain",                                   ecs_field: "[#{@device}][registered_domain]"),
+      CEFField.new("deviceDnsDomain",                                   ecs_field: "[#{@device}][registered_domain]", priority: 10),
       CEFField.new("deviceEventCategory",             key: "cat",       ecs_field: "[cef][category]"),
       CEFField.new("deviceExternalId",                                  ecs_field: (@device == 'host' ? "[host][id]" : "[observer][name]")),
       CEFField.new("deviceFacility",                                    ecs_field: "[log][syslog][facility][code]"),
@@ -463,7 +467,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       CEFField.new("requestMethod",                                     ecs_field: "[http][request][method]"),
       CEFField.new("requestUrl",                      key: "request",   ecs_field: "[url][original]"),
       CEFField.new("sourceAddress",                   key: "src",       ecs_field: "[source][ip]"),
-      CEFField.new("sourceDnsDomain",                                   ecs_field: "[source][registered_domain]"),
+      CEFField.new("sourceDnsDomain",                                   ecs_field: "[source][registered_domain]", priority: 10),
       CEFField.new("sourceGeoLatitude",               key: "slat",      ecs_field: "[source][geo][location][lat]", legacy: "sourceLatitude"),
       CEFField.new("sourceGeoLongitude",              key: "slong",     ecs_field: "[source][geo][location][lon]", legacy: "sourceLongitude"),
       CEFField.new("sourceHostName",                  key: "shost",     ecs_field: "[source][domain]"),
@@ -485,7 +489,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       CEFField.new("startTime",                       key: "start",     ecs_field: "[event][start]"),
       CEFField.new("transportProtocol",               key: "proto",     ecs_field: "[network][transport]"),
       CEFField.new("type",                                              ecs_field: "[cef][type]"),
-    ].compact.each do |cef|
+    ].sort_by(&:priority).each do |cef|
       field_name = ecs_select[disabled:cef.name, v1:cef.ecs_field]
 
       # whether the source is a cef_key or cef_name, normalize to field_name
@@ -495,7 +499,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       # whether source is a cef_name or a field_name, normalize to target
       normalized_encode_target = @reverse_mapping ? cef.key : cef.name
       encode_mapping[field_name] = normalized_encode_target
-      encode_mapping[cef.name] ||= normalized_encode_target
+      encode_mapping[cef.name]   = normalized_encode_target unless cef.name == field_name
 
       # if a field has an alias, normalize pass-through
       if cef.legacy

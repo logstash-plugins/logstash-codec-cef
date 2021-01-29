@@ -238,6 +238,7 @@ describe LogStash::Codecs::CEF do
             "[observer][ip]" => "123.45.67.89", # deviceAddress
             "[observer][hostname]" => "banana", # deviceHostName
             "[user_agent][original]" => "'Foo-Bar/2018.1.7; Email:user@example.com; Guid:test='", # requestClientApplication
+            "[source][registered_domain]" => "monkey.see" # sourceDnsDomain
           }
         end
 
@@ -253,7 +254,7 @@ describe LogStash::Codecs::CEF do
 
           codec.encode(event)
 
-          expect(results.first).to match(%r{^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|deviceAction=floop applicationProtocol=https deviceCustomIPv6Address1=4302:c0a5:0bb9:2dfd:7b4e:97f7:a328:98a9 deviceCustomIPv6Address1Label=internal-interface deviceAddress=123\.45\.67\.89 deviceHostName=banana requestClientApplication='Foo-Bar/2018\.1\.7; Email:user@example\.com; Guid:test\\='$}m)
+          expect(results.first).to match(%r{^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|deviceAction=floop applicationProtocol=https deviceCustomIPv6Address1=4302:c0a5:0bb9:2dfd:7b4e:97f7:a328:98a9 deviceCustomIPv6Address1Label=internal-interface deviceAddress=123\.45\.67\.89 deviceHostName=banana requestClientApplication='Foo-Bar/2018\.1\.7; Email:user@example\.com; Guid:test\\=' sourceDnsDomain=monkey.see$}m)
         end
       end
 
@@ -278,6 +279,7 @@ describe LogStash::Codecs::CEF do
               "[observer][ip]" => "123.45.67.89", # dvc
               "[observer][hostname]" => "banana", # dvchost
               "[user_agent][original]" => "'Foo-Bar/2018.1.7; Email:user@example.com; Guid:test='",
+              "[source][registered_domain]" => "monkey.see" # sourceDnsDomain
             }
           end
 
@@ -294,7 +296,7 @@ describe LogStash::Codecs::CEF do
 
             codec.encode(event)
 
-            expect(results.first).to match(%r{^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|act=floop app=https c6a1=4302:c0a5:0bb9:2dfd:7b4e:97f7:a328:98a9 c6a1Label=internal-interface dvc=123\.45\.67\.89 dvchost=banana requestClientApplication='Foo-Bar/2018\.1\.7; Email:user@example\.com; Guid:test\\='$}m)
+            expect(results.first).to match(%r{^CEF:0\|Elasticsearch\|Logstash\|1.0\|Logstash\|Logstash\|6\|act=floop app=https c6a1=4302:c0a5:0bb9:2dfd:7b4e:97f7:a328:98a9 c6a1Label=internal-interface dvc=123\.45\.67\.89 dvchost=banana requestClientApplication='Foo-Bar/2018\.1\.7; Email:user@example\.com; Guid:test\\=' sourceDnsDomain=monkey.see$}m)
           end
         end
       end
@@ -833,6 +835,8 @@ describe LogStash::Codecs::CEF do
       let(:name_field)      { ecs_select[disabled:'name',               v1:'[cef][name]']}
       let(:severity_field)  { ecs_select[disabled:'severity',           v1:'[event][severity]']}
 
+      let(:source_dns_domain_field) { ecs_select[disabled:'sourceDnsDomain',v1:'[source][registered_domain]'] }
+
       it "should return an equal event if encoded and decoded again" do
         codec.on_event{|data, newdata| results << newdata}
         codec.vendor = "%{" + vendor_field + "}"
@@ -841,7 +845,7 @@ describe LogStash::Codecs::CEF do
         codec.signature = "%{" + signature_field + "}"
         codec.name = "%{" + name_field + "}"
         codec.severity = "%{" + severity_field + "}"
-        codec.fields = [ "foo" ]
+        codec.fields = [ "foo", source_dns_domain_field ]
         event = LogStash::Event.new.tap do |e|
           e.set(vendor_field, "vendor")
           e.set(product_field, "product")
@@ -850,6 +854,7 @@ describe LogStash::Codecs::CEF do
           e.set(name_field, "name")
           e.set(severity_field, "1")
           e.set("foo", "bar")
+          e.set(source_dns_domain_field, "apple")
         end
         codec.encode(event)
         codec.decode(results.first) do |e|
@@ -860,6 +865,7 @@ describe LogStash::Codecs::CEF do
           expect(e.get(name_field)).to be == event.get(name_field)
           expect(e.get(severity_field)).to be == event.get(severity_field)
           expect(e.get('foo')).to be == event.get('foo')
+          expect(e.get(source_dns_domain_field)).to be == event.get(source_dns_domain_field)
         end
       end
     end
