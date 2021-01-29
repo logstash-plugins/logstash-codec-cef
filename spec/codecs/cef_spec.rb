@@ -9,7 +9,7 @@ require "json"
 require 'logstash/plugin_mixins/ecs_compatibility_support/spec_helper'
 
 describe LogStash::Codecs::CEF do
-  subject do
+  subject(:codec) do
     next LogStash::Codecs::CEF.new
   end
 
@@ -236,7 +236,7 @@ describe LogStash::Codecs::CEF do
             "[cef][device_custom_ipv6_address_1][value]" => "4302:c0a5:0bb9:2dfd:7b4e:97f7:a328:98a9", # deviceCustomIPv6Address1
             "[cef][device_custom_ipv6_address_1][label]" => "internal-interface", # deviceCustomIPv6Address1Label
             "[observer][ip]" => "123.45.67.89", # deviceAddress
-            "[observer][name]" => "banana", # deviceHostName
+            "[observer][hostname]" => "banana", # deviceHostName
             "[user_agent][original]" => "'Foo-Bar/2018.1.7; Email:user@example.com; Guid:test='", # requestClientApplication
           }
         end
@@ -276,7 +276,7 @@ describe LogStash::Codecs::CEF do
               "[cef][device_custom_ipv6_address_1][value]" => "4302:c0a5:0bb9:2dfd:7b4e:97f7:a328:98a9", # c6a1
               "[cef][device_custom_ipv6_address_1][label]" => "internal-interface", # c6a1Label
               "[observer][ip]" => "123.45.67.89", # dvc
-              "[observer][name]" => "banana", # dvchost
+              "[observer][hostname]" => "banana", # dvchost
               "[user_agent][original]" => "'Foo-Bar/2018.1.7; Email:user@example.com; Guid:test='",
             }
           end
@@ -656,7 +656,7 @@ describe LogStash::Codecs::CEF do
       let (:dots_in_keys) {'CEF:0|Vendor|Device|Version|13|my message|5|dvchost=loghost cat=traffic deviceSeverity=notice ad.nn=TEST src=192.168.0.1 destinationPort=53'}
       it "should be OK with dots in keys" do
         decode_one(subject, dots_in_keys) do |e|
-          insist { e.get(ecs_select[disabled:"deviceHostName",v1:"[observer][name]"]) } == "loghost"
+          insist { e.get(ecs_select[disabled:"deviceHostName",v1:"[observer][hostname]"]) } == "loghost"
           insist { e.get("ad.nn") } == 'TEST'
           insist { e.get(ecs_select[disabled:"sourceAddress",v1:"[source][ip]"]) } == '192.168.0.1'
           insist { e.get(ecs_select[disabled:"destinationPort",v1:"[destination][port]"]) } == '53'
@@ -796,6 +796,20 @@ describe LogStash::Codecs::CEF do
           decode_one(subject, message.dup) do |e|
             validate(e)
             insist { e.get("message_raw") } == message
+          end
+        end
+      end
+
+      context "legacy aliases" do
+        let(:cef_line) { "CEF:0|security|threatmanager|1.0|100|target acquired|10|destinationLongitude=-73.614830 destinationLatitude=45.505918 sourceLongitude=45.4628328 sourceLatitude=9.1076927" }
+
+        it ecs_select[disabled:"creates the fields as provided",v1:"maps to ECS fields"] do
+          decode_one(codec, cef_line.dup) do |event|
+            #                           |---- LEGACY: AS-PROVIDED ----| |--------- ECS: MAP TO FIELD ----------|
+            expect(event.get(ecs_select[disabled:'destinationLongitude',v1:'[destination][geo][location][lon]'])).to eq('-73.614830')
+            expect(event.get(ecs_select[disabled:'destinationLatitude', v1:'[destination][geo][location][lat]'])).to eq('45.505918')
+            expect(event.get(ecs_select[disabled:'sourceLongitude',     v1:'[source][geo][location][lon]'     ])).to eq('45.4628328')
+            expect(event.get(ecs_select[disabled:'sourceLatitude',      v1:'[source][geo][location][lat]'     ])).to eq('9.1076927')
           end
         end
       end
