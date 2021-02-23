@@ -3,6 +3,7 @@ require "logstash/util/buftok"
 require "logstash/util/charset"
 require "logstash/codecs/base"
 require "json"
+require "time"
 
 require 'logstash/plugin_mixins/ecs_compatibility_support'
 
@@ -15,7 +16,9 @@ require 'logstash/plugin_mixins/ecs_compatibility_support'
 class LogStash::Codecs::CEF < LogStash::Codecs::Base
   config_name "cef"
 
-  include LogStash::PluginMixins::ECSCompatibilitySupport(:disabled,:v1)
+  include LogStash::PluginMixins::ECSCompatibilitySupport(:disabled, :v1)
+
+  InvalidTimestamp = Class.new(StandardError)
 
   # Device vendor field in CEF header. The new value can include `%{foo}` strings
   # to help you build a new value from other parts of the event.
@@ -71,6 +74,16 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # * `\\r` (backslash "r") - means carriage return (ASCII 0x0D)
   # * `\\n` (backslash "n") - means newline (ASCII 0x0A)
   config :delimiter, :validate => :string
+
+  # When parsing timestamps that do not include a UTC offset in payloads that do not
+  # include the device's timezone, the default timezone is used.
+  # If none is provided the system timezone is used.
+  config :default_timezone, :validate => :string
+
+  # The locale is used to parse abbreviated month names from some CEF timestamp
+  # formats.
+  # If none is provided, the system default is used.
+  config :locale, :validate => :string
 
   # If raw_data_field is set, during decode of an event an additional field with
   # the provided name is added, which contains the raw data.
@@ -151,8 +164,6 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
   CEF_PREFIX = 'CEF:'.freeze
 
-  TIMESTAMP_FIELD = '@timestamp'.freeze
-
   public
   def initialize(params={})
     super(params)
@@ -169,6 +180,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       @delimiter = @delimiter.gsub("\\r", "\r").gsub("\\n", "\n")
       @buffer = FileWatch::BufferedTokenizer.new(@delimiter)
     end
+
+    require_relative 'cef/timestamp_normalizer'
+    @timestamp_normalzer = TimestampNormalizer.new(locale: @locale, timezone: @default_timezone)
 
     generate_header_fields!
     generate_mappings!
@@ -234,6 +248,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     # Use a scanning parser to capture the Extension Key/Value Pairs
     if message && message.include?('=')
       message = message.strip
+      extension_fields = {}
 
       message.scan(EXTENSION_KEY_VALUE_SCANNER) do |extension_field_key, raw_extension_field_value|
         # expand abbreviated extension field keys
@@ -245,11 +260,21 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
         # process legal extension field value escapes
         extension_field_value = raw_extension_field_value.gsub(EXTENSION_VALUE_ESCAPE_CAPTURE, '\1')
 
-        if extension_field_key == TIMESTAMP_FIELD
-          extension_field_value = normalize_timestamp(extension_field_value)
-        end
+        extension_fields[extension_field_key] = extension_field_value
+      end
 
-        event.set(extension_field_key, extension_field_value)
+      # in ECS mode, normalize timestamps including timezone.
+      if ecs_compatibility != :disabled
+        device_timezone = extension_fields['[event][timezone]']
+        @timestamp_fields.each do |timestamp_field_name|
+          raw_timestamp = extension_fields.delete(timestamp_field_name) or next
+          value = normalize_timestamp(raw_timestamp, device_timezone)
+          event.set(timestamp_field_name, value)
+        end
+      end
+
+      extension_fields.each do |field_key, field_value|
+        event.set(field_key, field_value)
       end
     end
 
@@ -318,23 +343,26 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     #                                 field name will be used as-provided.
     # @param priority [Integer] (optional): when multiple fields resolve to the same ECS field name, the field with the
     #                                 highest `prioriry` will be used by the encoder.
-    def initialize(name, key: name, ecs_field: name, legacy:nil, priority:0)
+    def initialize(name, key: name, ecs_field: name, legacy:nil, priority:0, normalize:nil)
       @name = name
       @key = key
       @ecs_field = ecs_field
       @legacy = legacy
       @priority = priority
+      @normalize = normalize
     end
     attr_reader :name
     attr_reader :key
     attr_reader :ecs_field
     attr_reader :legacy
     attr_reader :priority
+    attr_reader :normalize
   end
 
   def generate_mappings!
     encode_mapping = Hash.new
     decode_mapping = Hash.new
+    timestamp_fields = Set.new
     [
       CEFField.new("agentAddress",                    key: "agt",       ecs_field: "[agent][ip]"),
       CEFField.new("agentDnsDomain",                                    ecs_field: "[cef][agent][registered_domain]", priority: 10),
@@ -342,7 +370,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       CEFField.new("agentId",                         key: "aid",       ecs_field: "[agent][id]"),
       CEFField.new("agentMacAddress",                 key: "amac",      ecs_field: "[agent][mac]"),
       CEFField.new("agentNtDomain",                                     ecs_field: "[cef][agent][registered_domain]"),
-      CEFField.new("agentReceiptTime",                key: "art",       ecs_field: "[event][created]"),
+      CEFField.new("agentReceiptTime",                key: "art",       ecs_field: "[event][created]", normalize: :timestamp),
       CEFField.new("agentTimeZone",                   key: "atz",       ecs_field: "[cef][agent][timezone]"),
       CEFField.new("agentTranslatedAddress",                            ecs_field: "[cef][agent][nat][ip]"),
       CEFField.new("agentTranslatedZoneExternalID",                     ecs_field: "[cef][agent][translated_zone][external_id]"),
@@ -427,7 +455,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       CEFField.new("devicePayloadId",                                   ecs_field: "[cef][payload_id]"),
       CEFField.new("deviceProcessId",                 key: "dvcpid",    ecs_field: "[process][pid]"),
       CEFField.new("deviceProcessName",                                 ecs_field: "[process][name]"),
-      CEFField.new("deviceReceiptTime",               key: "rt",        ecs_field: "@timestamp"),
+      CEFField.new("deviceReceiptTime",               key: "rt",        ecs_field: "@timestamp", normalize: :timestamp),
       CEFField.new("deviceTimeZone",                  key: "dtz",       ecs_field: "[event][timezone]", legacy: "destinationTimeZone"),
       CEFField.new("deviceTranslatedAddress",                           ecs_field: "[host][nat][ip]"),
       CEFField.new("deviceTranslatedZoneExternalID",                    ecs_field: "[cef][translated_zone][external_id]"),
@@ -435,25 +463,25 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       CEFField.new("deviceVersion",                                     ecs_field: "[observer][version]"),
       CEFField.new("deviceZoneExternalID",                              ecs_field: "[cef][zone][external_id]"),
       CEFField.new("deviceZoneURI",                                     ecs_field: "[cef][zone][uri]"),
-      CEFField.new("endTime",                         key: "end",       ecs_field: "[event][end]"),
+      CEFField.new("endTime",                         key: "end",       ecs_field: "[event][end]", normalize: :timestamp),
       CEFField.new("eventId",                                           ecs_field: "[event][id]"),
       CEFField.new("eventOutcome",                    key: "outcome",   ecs_field: "[event][outcome]"),
       CEFField.new("externalId",                                        ecs_field: "[cef][external_id]"),
       CEFField.new("fileCreateTime",                                    ecs_field: "[file][created]"),
       CEFField.new("fileHash",                                          ecs_field: "[file][hash]]"),
       CEFField.new("fileId",                                            ecs_field: "[file][inode]"),
-      CEFField.new("fileModificationTime",                              ecs_field: "[file][mtime]"),
+      CEFField.new("fileModificationTime",                              ecs_field: "[file][mtime]", normalize: :timestamp),
       CEFField.new("fileName",                        key: "fname",     ecs_field: "[file][name]"),
       CEFField.new("filePath",                                          ecs_field: "[file][path]"),
       CEFField.new("filePermission",                                    ecs_field: "[file][group]"),
       CEFField.new("fileSize",                        key: "fsize",     ecs_field: "[file][size]"),
       CEFField.new("fileType",                                          ecs_field: "[file][extension]"),
-      CEFField.new("managerReceiptTime",              key: "mrt",       ecs_field: "[event][ingested]"),
+      CEFField.new("managerReceiptTime",              key: "mrt",       ecs_field: "[event][ingested]", normalize: :timestamp),
       CEFField.new("message",                         key: "msg",       ecs_field: "[message]"),
-      CEFField.new("oldFileCreateTime",                                 ecs_field: "[cef][old_file][created]"),
+      CEFField.new("oldFileCreateTime",                                 ecs_field: "[cef][old_file][created]", normalize: :timestamp),
       CEFField.new("oldFileHash",                                       ecs_field: "[cef][old_file][hash]"),
       CEFField.new("oldFileId",                                         ecs_field: "[cef][old_file][inode]"),
-      CEFField.new("oldFileModificationTime",                           ecs_field: "[cef][old_file][mtime]"),
+      CEFField.new("oldFileModificationTime",                           ecs_field: "[cef][old_file][mtime]", normalize: :timestamp),
       CEFField.new("oldFileName",                                       ecs_field: "[cef][old_file][name]"),
       CEFField.new("oldFilePath",                                       ecs_field: "[cef][old_file][path]"),
       CEFField.new("oldFilePermission",                                 ecs_field: "[cef][old_file][group]"),
@@ -486,7 +514,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       CEFField.new("sourceUserPrivileges",            key: "spriv",     ecs_field: "[source][user][group][name]"),
       CEFField.new("sourceZoneExternalID",                              ecs_field: "[cef][source][zone][external_id]"),
       CEFField.new("sourceZoneURI",                                     ecs_field: "[cef][source][zone][uri]"),
-      CEFField.new("startTime",                       key: "start",     ecs_field: "[event][start]"),
+      CEFField.new("startTime",                       key: "start",     ecs_field: "[event][start]", normalize: :timestamp),
       CEFField.new("transportProtocol",               key: "proto",     ecs_field: "[network][transport]"),
       CEFField.new("type",                                              ecs_field: "[cef][type]"),
     ].sort_by(&:priority).each do |cef|
@@ -506,10 +534,13 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
         decode_mapping[cef.legacy] = ecs_select[disabled:cef.legacy, v1:cef.ecs_field]
         encode_mapping[cef.legacy] = @reverse_mapping ? cef.key : cef.legacy
       end
+
+      timestamp_fields << field_name if ecs_compatibility != :disabled && cef.normalize == :timestamp
     end
 
     @decode_mapping = decode_mapping.dup.freeze
     @encode_mapping = encode_mapping.dup.freeze
+    @timestamp_fields = timestamp_fields.dup.freeze
   end
 
   # Escape pipes and backslashes in the header. Equal signs are ok.
@@ -536,14 +567,13 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
          .gsub(EXTENSION_VALUE_SANITIZER_PATTERN, EXTENSION_VALUE_SANITIZER_MAPPING)
   end
 
-  def normalize_timestamp(value)
-    time = case value
-           when Time then value
-           when String then Time.parse(value)
-           when Number then Time.at(value)
-           else fail("Failed to normalize time `#{value.inspect}`")
-           end
-    LogStash::Timestamp.new(time)
+  def normalize_timestamp(value, device_timezone_name)
+    value = @timestamp_normalzer.normalize(value, device_timezone_name).iso8601(9)
+
+    LogStash::Timestamp.new(value)
+  rescue => e
+    @logger.error("Failed to parse CEF timestamp value `#{value}` (#{e.message})")
+    raise InvalidTimestamp.new("Not a valid CEF timestamp: `#{value}`")
   end
 
   def get_value(fieldname, event)

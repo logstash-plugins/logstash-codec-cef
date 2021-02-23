@@ -548,6 +548,32 @@ describe LogStash::Codecs::CEF do
         end
       end
 
+      context "zoneless deviceReceiptTime(rt) when deviceTimeZone(dtz) is provided" do
+        let(:cef_formatted_timestamp) { 'Jul 19 2017 10:50:21.127' }
+        let(:zone_name) { 'Europe/Moscow' }
+
+        let(:utc_timestamp) { Time.iso8601("2017-07-19T07:50:21.127Z") } # In summer of 2017, Europe/Moscow was UTC+03:00
+
+        let(:destination_time_zoned) { %Q{CEF:0|Security|threatmanager|1.0|100|worm successfully stopped|Very-High| eventId=1 msg=Worm successfully stopped art=1500464384997 deviceSeverity=10 rt=#{cef_formatted_timestamp} src=10.0.0.1 sourceZoneURI=/All Zones/ArcSight System/Private Address Space Zones/RFC1918: 10.0.0.0-10.255.255.255 spt=1232 dst=2.1.2.2 destinationZoneURI=/All Zones/ArcSight System/Public Address Space Zones/RIPE NCC/2.0.0.0-2.255.255.255 (RIPE NCC) ahost=connector.rhel72 agt=192.168.231.129 agentZoneURI=/All Zones/ArcSight System/Private Address Space Zones/RFC1918: 192.168.0.0-192.168.255.255 amac=00-0C-29-51-8A-84 av=7.6.0.8009.0 atz=Europe/Lisbon at=syslog_file dvchost=client1 dtz=#{zone_name} _cefVer=0.1 aid=3UBajWl0BABCABBzZSlmUdw==} }
+
+        if ecs_select.active_mode == :disabled
+          it 'persists deviceReceiptTime and deviceTimeZone verbatim' do
+            decode_one(subject, destination_time_zoned) do |event|
+              expect(event.get('deviceReceiptTime')).to eq("Jul 19 2017 10:50:21.127")
+              expect(event.get('deviceTimeZone')).to eq('Europe/Moscow')
+            end
+          end
+        else
+          it 'sets the @timestamp using the value in `rt` combined with the offset provided by `dtz`' do
+            decode_one(subject, destination_time_zoned) do |event|
+              expected_time = LogStash::Timestamp.new(utc_timestamp)
+              expect(event.get('[@timestamp]').to_s).to eq(expected_time.to_s)
+              expect(event.get('[event][timezone]')).to eq(zone_name)
+            end
+          end
+        end
+      end
+
       let(:malformed_unescaped_equals_in_extension_value) { %q{CEF:0|FooBar|Web Gateway|1.2.3.45.67|200|Success|2|rt=Sep 07 2018 14:50:39 cat=Access Log dst=1.1.1.1 dhost=foo.example.com suser=redacted src=2.2.2.2 requestMethod=POST request='https://foo.example.com/bar/bingo/1' requestClientApplication='Foo-Bar/2018.1.7; Email:user@example.com; Guid:test=' cs1= cs1Label=Foo Bar} }
       it 'should split correctly' do
         decode_one(subject, malformed_unescaped_equals_in_extension_value) do |event|
@@ -563,7 +589,8 @@ describe LogStash::Codecs::CEF do
           if ecs_compatibility == :disabled
             expect(event.get('deviceReceiptTime')).to eq('Sep 07 2018 14:50:39')
           else
-            expect(event.get('[@timestamp]').to_s).to eq('2018-09-07T14:50:39.000Z')
+            expected_time = LogStash::Timestamp.new(Time.parse('Sep 07 2018 14:50:39')).to_s
+            expect(event.get('[@timestamp]').to_s).to eq(expected_time)
           end
           expect(event.get(ecs_select[disabled:'deviceEventCategory',     v1:'[cef][category]'])).to eq('Access Log')
           expect(event.get(ecs_select[disabled:'deviceVersion',           v1:'[observer][version]'])).to eq('1.2.3.45.67')
