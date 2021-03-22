@@ -261,10 +261,20 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   def decode(data, &block)
     if @delimiter
       @buffer.extract(data).each do |line|
-        handle(line, &block)
+        dumping_handle(line, &block)
       end
     else
+      dumping_handle(data, &block)
+    end
+  end
+
+  def dumping_handle(data, &block)
+    begin
+      original_data = data.dup
       handle(data, &block)
+    rescue => e
+      logger.error("Problem processing data: ", :original_data => original_data)
+      raise
     end
   end
 
