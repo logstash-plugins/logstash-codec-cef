@@ -273,7 +273,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       original_data = data.dup
       handle(data, &block)
     rescue => e
-      logger.error("Problem processing data: ", :original_data => original_data)
+      logger.error("Problem processing data : ", :original_data => original_data)
       raise
     end
   end
