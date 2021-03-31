@@ -261,24 +261,15 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   def decode(data, &block)
     if @delimiter
       @buffer.extract(data).each do |line|
-        dumping_handle(line, &block)
+        handle(line, &block)
       end
     else
-      dumping_handle(data, &block)
-    end
-  end
-
-  def dumping_handle(data, &block)
-    begin
-      original_data = data.dup
       handle(data, &block)
-    rescue => e
-      logger.error("Problem processing data : ", :original_data => original_data)
-      raise
     end
   end
 
   def handle(data, &block)
+    original_data = data.dup
     event = LogStash::Event.new
     event.set(raw_data_field, data) unless raw_data_field.nil?
 
@@ -343,7 +334,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     yield event
   rescue => e
     @logger.error("Failed to decode CEF payload. Generating failure event with payload in message field.",
-                  :exception => e.class, :message => e.message, :backtrace => e.backtrace, :data => data)
+                  :exception => e.class, :message => e.message, :backtrace => e.backtrace, :original_data => original_data)
     yield LogStash::Event.new("message" => data, "tags" => ["_cefparsefailure"])
   end
 
