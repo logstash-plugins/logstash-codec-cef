@@ -1,11 +1,10 @@
 ## 6.1.2
- - Added error log with full payload when something bad happens in decoding a message[]()
+ - Added error log with full payload when something bad happens in decoding a message[#84](https://github.com/logstash-plugins/logstash-codec-cef/pull/84)
 
 ## 6.1.1
  - Improved encoding performance, especially when encoding many extension fields [#81](https://github.com/logstash-plugins/logstash-codec-cef/pull/81)
 
 ## 6.1.0
->>>>>>> Stashed changes
  - Fixed CEF short to long name translation for ahost/agentHostName field, according to documentation [#75](https://github.com/logstash-plugins/logstash-codec-cef/pull/75)
 
 ## 6.0.1
