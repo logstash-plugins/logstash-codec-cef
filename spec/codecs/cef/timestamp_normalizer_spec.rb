@@ -70,10 +70,24 @@ describe LogStash::Codecs::CEF::TimestampNormalizer do
   end
 
   context "when locale is specified" do
-    let(:locale_spec) { 'de_DE' }
+    let(:locale_language) { 'de' }
+    let(:locale_country) { 'DE' }
+    let(:locale_spec) { "#{locale_language}_#{locale_country}" }
+
+    # Due to locale-provider loading changes in JDK 9, abbreviations for months
+    # depend on a combination of the JDK version and the `java.locale.providers`
+    # system property.
+    # Instead of hard-coding a localized month name, use this process's locales
+    # to generate one.
+    let(:java_locale) { java.util.Locale.new(locale_language, locale_country) }
+    let(:localized_march_abbreviation) do
+      months = java.text.DateFormatSymbols.new(java_locale).get_short_months
+      months[2] # march
+    end
+
     subject(:timestamp_normalizer) { described_class.new(locale: locale_spec) }
 
-    let(:parsable_string) { "März 17 2019 17:57:06.456 +01:00" }
+    let(:parsable_string) { "#{localized_march_abbreviation} 17 2019 17:57:06.456 +01:00" }
 
     it 'uses the locale to parse the date' do
       expect(parsed_result).to eq(Time.parse("2019-03-17T17:57:06.456+01:00"))
