@@ -802,7 +802,7 @@ describe LogStash::Codecs::CEF do
     end
   end
 
-  context "encode and decode" do
+  context "encode and decode", :ecs_compatibility_support do
     subject(:codec) { LogStash::Codecs::CEF.new }
 
     let(:results)   { [] }

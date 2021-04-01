@@ -1,3 +1,6 @@
+## 6.2.0
+ - Introduce ECS Compatibility mode [#83](https://github.com/logstash-plugins/logstash-codec-cef/pull/83).
+
 ## 6.1.2
  - Added error log with full payload when something bad happens in decoding a message[#84](https://github.com/logstash-plugins/logstash-codec-cef/pull/84)
 

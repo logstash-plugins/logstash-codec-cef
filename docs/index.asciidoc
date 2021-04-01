@@ -27,6 +27,25 @@ https://community.saas.hpe.com/dcvta86296/attachments/dcvta86296/connector-docum
 If this codec receives a payload from an input that is not a valid CEF message, then it will
 produce an event with the payload as the 'message' field and a '_cefparsefailure' tag.
 
+==== Compatibility with the Elastic Common Schema (ECS)
+
+This plugin can be used to decode CEF events _into_ the Elastic Common Schema, or to encode ECS-compatible events into CEF.
+It can also be used _without_ ECS, encoding and decoding events using only CEF-defined field names and keys.
+
+The ECS Compatibility mode for a specific plugin instance can be controlled by setting <<plugins-{type}s-{plugin}-ecs_compatibility>> when defining the codec:
+
+[source]
+    input {
+      tcp {
+        # ...
+        codec => cef {
+          ecs_compatibility => v1
+        }
+      }
+    }
+
+If left unspecified, the value of the `pipeline.ecs_compatibility` setting is used.
+
 [id="plugins-{type}s-{plugin}-options"]
 ==== Cef Codec Configuration Options
 
@@ -34,6 +53,8 @@ produce an event with the payload as the 'message' field and a '_cefparsefailure
 |=======================================================================
 |Setting |Input type|Required
 | <<plugins-{type}s-{plugin}-delimiter>> |<<string,string>>|No
+| <<plugins-{type}s-{plugin}-device>> |<<string,string>>|No
+| <<plugins-{type}s-{plugin}-ecs_compatibility>> |<<string,string>>|No
 | <<plugins-{type}s-{plugin}-fields>> |<<array,array>>|No
 | <<plugins-{type}s-{plugin}-name>> |<<string,string>>|No
 | <<plugins-{type}s-{plugin}-product>> |<<string,string>>|No
@@ -69,11 +90,44 @@ This setting allows the following character sequences to have special meaning:
 * `\\r` (backslash "r") - means carriage return (ASCII 0x0D)
 * `\\n` (backslash "n") - means newline (ASCII 0x0A)
 
+[id="plugins-{type}s-{plugin}-device"]
+===== `device`
+
+* Value type is <<string,string>>
+* Supported values are:
+** `observer`: indicates that device-specific fields represent the device used to _observe_ the event.
+** `host`: indicates that device-specific fields represent the device on which the event _occurred_.
+* The default value for this setting is `observer`.
+* Option has no effect when <<plugins-{type}s-{plugin}-ecs_compatibility,`ecs_compatibility => disabled`>>.
+
+Defines a set of device-specific CEF fields as either representing the device on which an
+event _occurred_, or merely the device from which the event was _observed_.
+This causes the relevant fields to be routed to either the `host` or the `observer`
+top-level groupings.
+
+If the codec handles data from a variety of sources, the ECS recommendation is to use `observer`.
+
+[id="plugins-{type}s-{plugin}-ecs_compatibility"]
+===== `ecs_compatibility`
+
+* Value type is <<string,string>>
+* Supported values are:
+** `disabled`: uses CEF-defined field names in the event (e.g., `bytesIn`, `sourceAddress`)
+** `v1`: supports ECS-compatible event fields (e.g., `[source][bytes]`, `[source][ip]`)
+* Default value depends on which version of Logstash is running:
+** When Logstash provides a `pipeline.ecs_compatibility` setting, its value is used as the default
+** Otherwise, the default value is `disabled`.
+
+Controls this plugin's compatibility with the
+https://www.elastic.co/guide/en/ecs/current/index.html[Elastic Common Schema
+(ECS)].
+
 [id="plugins-{type}s-{plugin}-fields"]
 ===== `fields` 
 
   * Value type is <<array,array>>
   * Default value is `[]`
+  * Option has no effect when _decoding_
 
 Fields to be included in CEV extension part as key/value pairs
 
@@ -82,6 +136,7 @@ Fields to be included in CEV extension part as key/value pairs
 
   * Value type is <<string,string>>
   * Default value is `"Logstash"`
+  * Option has no effect when _decoding_
 
 Name field in CEF header. The new value can include `%{foo}` strings
 to help you build a new value from other parts of the event.
@@ -91,6 +146,7 @@ to help you build a new value from other parts of the event.
 
   * Value type is <<string,string>>
   * Default value is `"Logstash"`
+  * Option has no effect when _decoding_
 
 Device product field in CEF header. The new value can include `%{foo}` strings
 to help you build a new value from other parts of the event.
@@ -101,6 +157,7 @@ to help you build a new value from other parts of the event.
 
   * Value type is <<boolean,boolean>>
   * Default value is `false`
+  * Option has no effect when _decoding_
 
 Set to true to adhere to the specifications and encode using the CEF key name (short name) for the CEF field names.
 
@@ -109,6 +166,7 @@ Set to true to adhere to the specifications and encode using the CEF key name (s
 
   * Value type is <<string,string>>
   * Default value is `"6"`
+  * Option has no effect when _decoding_
 
 Severity field in CEF header. The new value can include `%{foo}` strings
 to help you build a new value from other parts of the event.
@@ -122,6 +180,7 @@ All invalid values will be mapped to the default of 6.
 
   * Value type is <<string,string>>
   * Default value is `"Logstash"`
+  * Option has no effect when _decoding_
 
 Signature ID field in CEF header. The new value can include `%{foo}` strings
 to help you build a new value from other parts of the event.
@@ -131,6 +190,7 @@ to help you build a new value from other parts of the event.
 
   * Value type is <<string,string>>
   * Default value is `"Elasticsearch"`
+  * Option has no effect when _decoding_
 
 Device vendor field in CEF header. The new value can include `%{foo}` strings
 to help you build a new value from other parts of the event.
@@ -140,6 +200,7 @@ to help you build a new value from other parts of the event.
 
   * Value type is <<string,string>>
   * Default value is `"1.0"`
+  * Option has no effect when _decoding_
 
 Device version field in CEF header. The new value can include `%{foo}` strings
 to help you build a new value from other parts of the event.
