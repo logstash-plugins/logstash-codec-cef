@@ -34,7 +34,8 @@ It can also be used _without_ ECS, encoding and decoding events using only CEF-d
 
 The ECS Compatibility mode for a specific plugin instance can be controlled by setting <<plugins-{type}s-{plugin}-ecs_compatibility>> when defining the codec:
 
-[source]
+[source,sh]
+-----
     input {
       tcp {
         # ...
@@ -43,6 +44,7 @@ The ECS Compatibility mode for a specific plugin instance can be controlled by s
         }
       }
     }
+-----
 
 If left unspecified, the value of the `pipeline.ecs_compatibility` setting is used.
 
@@ -88,8 +90,8 @@ Because the CEF format allows ambiguous timestamp formats, some reasonable assum
 
 * Value type is <<string,string>>
 * Supported values are:
-** https://en.wikipedia.org/wiki/List_of_tz_database_time_zones[Timezone names] (e.g.`Europe/Moscow`, 'America/Argentina/Buenos_Aires`)
-** UTC Offsets (e.g., `-08:00`, `+03:00`)
+** https://en.wikipedia.org/wiki/List_of_tz_database_time_zones[Timezone names] (such as `Europe/Moscow`, `America/Argentina/Buenos_Aires`)
+** UTC Offsets (such as `-08:00`, `+03:00`)
 * The default value is your system time zone
 * This option has no effect when _encoding_.
 
@@ -151,7 +153,7 @@ If the codec handles data from a variety of sources, the ECS recommendation is t
 ** Otherwise, the default value is `disabled`.
 
 Controls this plugin's compatibility with the
-https://www.elastic.co/guide/en/ecs/current/index.html[Elastic Common Schema
+{ecs-ref}[Elastic Common Schema (ECS)]
 (ECS)].
 
 [id="plugins-{type}s-{plugin}-fields"]
@@ -256,5 +258,4 @@ to help you build a new value from other parts of the event.
 When this codec is used in an Output Plugin, this option can be used to specify the
 value of the device version field in CEF header. The new value can include `%{foo}` strings
 to help you build a new value from other parts of the event.
-
 
