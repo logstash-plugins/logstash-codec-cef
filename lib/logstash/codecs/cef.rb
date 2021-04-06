@@ -3,6 +3,9 @@ require "logstash/util/buftok"
 require "logstash/util/charset"
 require "logstash/codecs/base"
 require "json"
+require "time"
+
+require 'logstash/plugin_mixins/ecs_compatibility_support'
 
 # Implementation of a Logstash codec for the ArcSight Common Event Format (CEF)
 # Based on Revision 20 of Implementing ArcSight CEF, dated from June 05, 2013
@@ -12,6 +15,10 @@ require "json"
 # produce an event with the payload as the 'message' field and a '_cefparsefailure' tag.
 class LogStash::Codecs::CEF < LogStash::Codecs::Base
   config_name "cef"
+
+  include LogStash::PluginMixins::ECSCompatibilitySupport(:disabled, :v1)
+
+  InvalidTimestamp = Class.new(StandardError)
 
   # Device vendor field in CEF header. The new value can include `%{foo}` strings
   # to help you build a new value from other parts of the event.
@@ -68,106 +75,24 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # * `\\n` (backslash "n") - means newline (ASCII 0x0A)
   config :delimiter, :validate => :string
 
+  # When parsing timestamps that do not include a UTC offset in payloads that do not
+  # include the device's timezone, the default timezone is used.
+  # If none is provided the system timezone is used.
+  config :default_timezone, :validate => :string
+
+  # The locale is used to parse abbreviated month names from some CEF timestamp
+  # formats.
+  # If none is provided, the system default is used.
+  config :locale, :validate => :string
+
   # If raw_data_field is set, during decode of an event an additional field with
   # the provided name is added, which contains the raw data.
   config :raw_data_field, :validate => :string
 
-  HEADER_FIELDS = ['cefVersion','deviceVendor','deviceProduct','deviceVersion','deviceEventClassId','name','severity']
-
-  # Translating and flattening the CEF extensions with known field names as documented in the Common Event Format whitepaper
-  MAPPINGS = {
-      "act" => "deviceAction",
-      "app" => "applicationProtocol",
-      "c6a1" => "deviceCustomIPv6Address1",
-      "c6a1Label" => "deviceCustomIPv6Address1Label",
-      "c6a2" => "deviceCustomIPv6Address2",
-      "c6a2Label" => "deviceCustomIPv6Address2Label",
-      "c6a3" => "deviceCustomIPv6Address3",
-      "c6a3Label" => "deviceCustomIPv6Address3Label",
-      "c6a4" => "deviceCustomIPv6Address4",
-      "c6a4Label" => "deviceCustomIPv6Address4Label",
-      "cat" => "deviceEventCategory",
-      "cfp1" => "deviceCustomFloatingPoint1",
-      "cfp1Label" => "deviceCustomFloatingPoint1Label",
-      "cfp2" => "deviceCustomFloatingPoint2",
-      "cfp2Label" => "deviceCustomFloatingPoint2Label",
-      "cfp3" => "deviceCustomFloatingPoint3",
-      "cfp3Label" => "deviceCustomFloatingPoint3Label",
-      "cfp4" => "deviceCustomFloatingPoint4",
-      "cfp4Label" => "deviceCustomFloatingPoint4Label",
-      "cn1" => "deviceCustomNumber1",
-      "cn1Label" => "deviceCustomNumber1Label",
-      "cn2" => "deviceCustomNumber2",
-      "cn2Label" => "deviceCustomNumber2Label",
-      "cn3" => "deviceCustomNumber3",
-      "cn3Label" => "deviceCustomNumber3Label",
-      "cnt" => "baseEventCount",
-      "cs1" => "deviceCustomString1",
-      "cs1Label" => "deviceCustomString1Label",
-      "cs2" => "deviceCustomString2",
-      "cs2Label" => "deviceCustomString2Label",
-      "cs3" => "deviceCustomString3",
-      "cs3Label" => "deviceCustomString3Label",
-      "cs4" => "deviceCustomString4",
-      "cs4Label" => "deviceCustomString4Label",
-      "cs5" => "deviceCustomString5",
-      "cs5Label" => "deviceCustomString5Label",
-      "cs6" => "deviceCustomString6",
-      "cs6Label" => "deviceCustomString6Label",
-      "dhost" => "destinationHostName",
-      "dmac" => "destinationMacAddress",
-      "dntdom" => "destinationNtDomain",
-      "dpid" => "destinationProcessId",
-      "dpriv" => "destinationUserPrivileges",
-      "dproc" => "destinationProcessName",
-      "dpt" => "destinationPort",
-      "dst" => "destinationAddress",
-      "duid" => "destinationUserId",
-      "duser" => "destinationUserName",
-      "dvc" => "deviceAddress",
-      "dvchost" => "deviceHostName",
-      "dvcpid" => "deviceProcessId",
-      "end" => "endTime",
-      "fname" => "fileName",
-      "fsize" => "fileSize",
-      "in" => "bytesIn",
-      "msg" => "message",
-      "out" => "bytesOut",
-      "outcome" => "eventOutcome",
-      "proto" => "transportProtocol",
-      "request" => "requestUrl",
-      "rt" => "deviceReceiptTime",
-      "shost" => "sourceHostName",
-      "smac" => "sourceMacAddress",
-      "sntdom" => "sourceNtDomain",
-      "spid" => "sourceProcessId",
-      "spriv" => "sourceUserPrivileges",
-      "sproc" => "sourceProcessName",
-      "spt" => "sourcePort",
-      "src" => "sourceAddress",
-      "start" => "startTime",
-      "suid" => "sourceUserId",
-      "suser" => "sourceUserName",
-      "ahost" => "agentHostName",
-      "art" => "agentReceiptTime",
-      "at" => "agentType",
-      "aid" => "agentId",
-      "_cefVer" => "cefVersion",
-      "agt" => "agentAddress",
-      "av" => "agentVersion",
-      "atz" => "agentTimeZone",
-      "dtz" => "destinationTimeZone",
-      "slong" => "sourceLongitude",
-      "slat" => "sourceLatitude",
-      "dlong" => "destinationLongitude",
-      "dlat" => "destinationLatitude",
-      "catdt" => "categoryDeviceType",
-      "mrt" => "managerReceiptTime",
-      "amac" => "agentMacAddress"
-  }
-
-  # Reverse mapping of CEF full field names to CEF extensions field names for encoding into a CEF event for output.
-  REVERSE_MAPPINGS = MAPPINGS.invert
+  # Defines whether a set of device-specific CEF fields represent the _observer_,
+  # or the actual `host` on which the event occurred. If this codec handles a mix,
+  # it is safe to use the default `observer`.
+  config :device, :validate => %w(observer host), :default => 'observer'
 
   # A CEF Header is a sequence of zero or more:
   #  - backslash-escaped pipes; OR
@@ -255,6 +180,12 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       @delimiter = @delimiter.gsub("\\r", "\r").gsub("\\n", "\n")
       @buffer = FileWatch::BufferedTokenizer.new(@delimiter)
     end
+
+    require_relative 'cef/timestamp_normalizer'
+    @timestamp_normalzer = TimestampNormalizer.new(locale: @locale, timezone: @default_timezone)
+
+    generate_header_fields!
+    generate_mappings!
   end
 
   public
@@ -286,7 +217,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
     # Use a scanning parser to capture the HEADER_FIELDS
     unprocessed_data = data
-    HEADER_FIELDS.each do |field_name|
+    @header_fields.each do |field_name|
       match_data = HEADER_SCANNER.match(unprocessed_data)
       break if match_data.nil? # missing fields
 
@@ -304,22 +235,24 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     message = unprocessed_data
 
     # Try and parse out the syslog header if there is one
-    if (cef_version = event.get('cefVersion')).include?(' ')
+    cef_version_field = @header_fields[0]
+    if (cef_version = event.get(cef_version_field)).include?(' ')
       split_cef_version = cef_version.rpartition(' ')
-      event.set('syslog', split_cef_version[0])
-      event.set('cefVersion', split_cef_version[2])
+      event.set(@syslog_header, split_cef_version[0])
+      event.set(cef_version_field, split_cef_version[2])
     end
 
     # Get rid of the CEF bit in the version
-    event.set('cefVersion', delete_cef_prefix(event.get('cefVersion')))
+    event.set(cef_version_field, delete_cef_prefix(event.get(cef_version_field)))
 
     # Use a scanning parser to capture the Extension Key/Value Pairs
     if message && message.include?('=')
       message = message.strip
+      extension_fields = {}
 
       message.scan(EXTENSION_KEY_VALUE_SCANNER) do |extension_field_key, raw_extension_field_value|
         # expand abbreviated extension field keys
-        extension_field_key = MAPPINGS.fetch(extension_field_key, extension_field_key)
+        extension_field_key = @decode_mapping.fetch(extension_field_key, extension_field_key)
 
         # convert extension field name to strict legal field_reference, fixing field names with ambiguous array-like syntax
         extension_field_key = extension_field_key.sub(EXTENSION_KEY_ARRAY_CAPTURE, '[\1]\2') if extension_field_key.end_with?(']')
@@ -327,7 +260,21 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
         # process legal extension field value escapes
         extension_field_value = raw_extension_field_value.gsub(EXTENSION_VALUE_ESCAPE_CAPTURE, '\1')
 
-        event.set(extension_field_key, extension_field_value)
+        extension_fields[extension_field_key] = extension_field_value
+      end
+
+      # in ECS mode, normalize timestamps including timezone.
+      if ecs_compatibility != :disabled
+        device_timezone = extension_fields['[event][timezone]']
+        @timestamp_fields.each do |timestamp_field_name|
+          raw_timestamp = extension_fields.delete(timestamp_field_name) or next
+          value = normalize_timestamp(raw_timestamp, device_timezone)
+          event.set(timestamp_field_name, value)
+        end
+      end
+
+      extension_fields.each do |field_key, field_value|
+        event.set(field_key, field_value)
       end
     end
 
@@ -368,6 +315,234 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
   private
 
+  def generate_header_fields!
+    # @header_fields is an _ordered_ set of fields.
+    @header_fields = [
+      ecs_select[disabled: 'cefVersion',         v1: '[cef][version]'],
+      ecs_select[disabled: 'deviceVendor',       v1: '[observer][vendor]'],
+      ecs_select[disabled: 'deviceProduct',      v1: '[observer][product]'],
+      ecs_select[disabled: 'deviceVersion',      v1: '[observer][version]'],
+      ecs_select[disabled: 'deviceEventClassId', v1: '[event][code]'],
+      ecs_select[disabled: 'name',               v1: '[cef][name]'],
+      ecs_select[disabled: 'severity',           v1: '[event][severity]']
+    ].map(&:freeze).freeze
+    # the @syslog_header is the field name used when a syslog header preceeds the CEF Version.
+    @syslog_header = ecs_select[disabled:'syslog',v1:'[log][syslog][header]']
+  end
+
+  class CEFField
+    ##
+    # @param name [String]: the full CEF name of a field
+    # @param key [String] (optional): an abbreviated CEF key to use when encoding a value with `reverse_mapping => true`
+    #                                 when left unspecified, the `key` is the field's `name`.
+    # @param ecs_field [String] (optional): an ECS-compatible field reference to use, with square-bracket syntax.
+    #                                 when left unspecified, the `ecs_field` is the field's `name`.
+    # @param legacy [String] (optional): a legacy CEF name to support in pass-through.
+    #                                 in decoding mode without ECS, field name will be used as-provided.
+    #                                 in encoding mode without ECS when provided to `fields` and `reverse_mapping => false`,
+    #                                 field name will be used as-provided.
+    # @param priority [Integer] (optional): when multiple fields resolve to the same ECS field name, the field with the
+    #                                 highest `prioriry` will be used by the encoder.
+    def initialize(name, key: name, ecs_field: name, legacy:nil, priority:0, normalize:nil)
+      @name = name
+      @key = key
+      @ecs_field = ecs_field
+      @legacy = legacy
+      @priority = priority
+      @normalize = normalize
+    end
+    attr_reader :name
+    attr_reader :key
+    attr_reader :ecs_field
+    attr_reader :legacy
+    attr_reader :priority
+    attr_reader :normalize
+  end
+
+  def generate_mappings!
+    encode_mapping = Hash.new
+    decode_mapping = Hash.new
+    timestamp_fields = Set.new
+    [
+      CEFField.new("agentAddress",                    key: "agt",       ecs_field: "[agent][ip]"),
+      CEFField.new("agentDnsDomain",                                    ecs_field: "[cef][agent][registered_domain]", priority: 10),
+      CEFField.new("agentHostName",                   key: "ahost",     ecs_field: "[agent][name]"),
+      CEFField.new("agentId",                         key: "aid",       ecs_field: "[agent][id]"),
+      CEFField.new("agentMacAddress",                 key: "amac",      ecs_field: "[agent][mac]"),
+      CEFField.new("agentNtDomain",                                     ecs_field: "[cef][agent][registered_domain]"),
+      CEFField.new("agentReceiptTime",                key: "art",       ecs_field: "[event][created]", normalize: :timestamp),
+      CEFField.new("agentTimeZone",                   key: "atz",       ecs_field: "[cef][agent][timezone]"),
+      CEFField.new("agentTranslatedAddress",                            ecs_field: "[cef][agent][nat][ip]"),
+      CEFField.new("agentTranslatedZoneExternalID",                     ecs_field: "[cef][agent][translated_zone][external_id]"),
+      CEFField.new("agentTranslatedZoneURI",                            ecs_field: "[cef][agent][translated_zone][uri]"),
+      CEFField.new("agentType",                       key: "at",        ecs_field: "[agent][type]"),
+      CEFField.new("agentVersion",                    key: "av",        ecs_field: "[agent][version]"),
+      CEFField.new("agentZoneExternalID",                               ecs_field: "[cef][agent][zone][external_id]"),
+      CEFField.new("agentZoneURI",                                      ecs_field: "[cef][agent][zone][uri]"),
+      CEFField.new("applicationProtocol",             key: "app",       ecs_field: "[network][protocol]"),
+      CEFField.new("baseEventCount",                  key: "cnt",       ecs_field: "[cef][base_event_count]"),
+      CEFField.new("bytesIn",                         key: "in",        ecs_field: "[source][bytes]"),
+      CEFField.new("bytesOut",                        key: "out",       ecs_field: "[destination][bytes]"),
+      CEFField.new("categoryDeviceType",              key: "catdt",     ecs_field: "[cef][device_type]"),
+      CEFField.new("customerExternalID",                                ecs_field: "[organization][id]"),
+      CEFField.new("customerURI",                                       ecs_field: "[organization][name]"),
+      CEFField.new("destinationAddress",              key: "dst",       ecs_field: "[destination][ip]"),
+      CEFField.new("destinationDnsDomain",                              ecs_field: "[destination][registered_domain]", priority: 10),
+      CEFField.new("destinationGeoLatitude",          key: "dlat",      ecs_field: "[destination][geo][location][lat]", legacy: "destinationLatitude"),
+      CEFField.new("destinationGeoLongitude",         key: "dlong",     ecs_field: "[destination][geo][location][lon]", legacy: "destinationLongitude"),
+      CEFField.new("destinationHostName",             key: "dhost",     ecs_field: "[destination][domain]"),
+      CEFField.new("destinationMacAddress",           key: "dmac",      ecs_field: "[destination][mac]"),
+      CEFField.new("destinationNtDomain",             key: "dntdom",    ecs_field: "[destination][registered_domain]"),
+      CEFField.new("destinationPort",                 key: "dpt",       ecs_field: "[destination][port]"),
+      CEFField.new("destinationProcessId",            key: "dpid",      ecs_field: "[destination][process][pid]"),
+      CEFField.new("destinationProcessName",          key: "dproc",     ecs_field: "[destination][process][name]"),
+      CEFField.new("destinationServiceName",                            ecs_field: "[destination][service][name]"),
+      CEFField.new("destinationTranslatedAddress",                      ecs_field: "[destination][nat][ip]"),
+      CEFField.new("destinationTranslatedPort",                         ecs_field: "[destination][nat][port]"),
+      CEFField.new("destinationTranslatedZoneExternalID",               ecs_field: "[cef][destination][translated_zone][external_id]"),
+      CEFField.new("destinationTranslatedZoneURI",                      ecs_field: "[cef][destination][translated_zone][uri]"),
+      CEFField.new("destinationUserId",               key: "duid",      ecs_field: "[destination][user][id]"),
+      CEFField.new("destinationUserName",             key: "duser",     ecs_field: "[destination][user][name]"),
+      CEFField.new("destinationUserPrivileges",       key: "dpriv",     ecs_field: "[destination][user][group][name]"),
+      CEFField.new("destinationZoneExternalID",                         ecs_field: "[cef][destination][zone][external_id]"),
+      CEFField.new("destinationZoneURI",                                ecs_field: "[cef][destination][zone][uri]"),
+      CEFField.new("deviceAction",                    key: "act",       ecs_field: "[event][action]"),
+      CEFField.new("deviceAddress",                   key: "dvc",       ecs_field: "[#{@device}][ip]"),
+      CEFField.new("deviceCustomFloatingPoint1",      key: "cfp1",      ecs_field: "[cef][device_custom_floating_point_1][value]"),
+      CEFField.new("deviceCustomFloatingPoint1Label", key: "cfp1Label", ecs_field: "[cef][device_custom_floating_point_1][label]"),
+      CEFField.new("deviceCustomFloatingPoint2",      key: "cfp2",      ecs_field: "[cef][device_custom_floating_point_2][value]"),
+      CEFField.new("deviceCustomFloatingPoint2Label", key: "cfp2Label", ecs_field: "[cef][device_custom_floating_point_2][label]"),
+      CEFField.new("deviceCustomFloatingPoint3",      key: "cfp3",      ecs_field: "[cef][device_custom_floating_point_3][value]"),
+      CEFField.new("deviceCustomFloatingPoint3Label", key: "cfp3Label", ecs_field: "[cef][device_custom_floating_point_3][label]"),
+      CEFField.new("deviceCustomFloatingPoint4",      key: "cfp4",      ecs_field: "[cef][device_custom_floating_point_4][value]"),
+      CEFField.new("deviceCustomFloatingPoint4Label", key: "cfp4Label", ecs_field: "[cef][device_custom_floating_point_4][label]"),
+      CEFField.new("deviceCustomIPv6Address1",        key: "c6a1",      ecs_field: "[cef][device_custom_ipv6_address_1][value]"),
+      CEFField.new("deviceCustomIPv6Address1Label",   key: "c6a1Label", ecs_field: "[cef][device_custom_ipv6_address_1][label]"),
+      CEFField.new("deviceCustomIPv6Address2",        key: "c6a2",      ecs_field: "[cef][device_custom_ipv6_address_2][value]"),
+      CEFField.new("deviceCustomIPv6Address2Label",   key: "c6a2Label", ecs_field: "[cef][device_custom_ipv6_address_2][label]"),
+      CEFField.new("deviceCustomIPv6Address3",        key: "c6a3",      ecs_field: "[cef][device_custom_ipv6_address_3][value]"),
+      CEFField.new("deviceCustomIPv6Address3Label",   key: "c6a3Label", ecs_field: "[cef][device_custom_ipv6_address_3][label]"),
+      CEFField.new("deviceCustomIPv6Address4",        key: "c6a4",      ecs_field: "[cef][device_custom_ipv6_address_4][value]"),
+      CEFField.new("deviceCustomIPv6Address4Label",   key: "c6a4Label", ecs_field: "[cef][device_custom_ipv6_address_4][label]"),
+      CEFField.new("deviceCustomNumber1",             key: "cn1",       ecs_field: "[cef][device_custom_number_1][value]"),
+      CEFField.new("deviceCustomNumber1Label",        key: "cn1Label",  ecs_field: "[cef][device_custom_number_1][label]"),
+      CEFField.new("deviceCustomNumber2",             key: "cn2",       ecs_field: "[cef][device_custom_number_2][value]"),
+      CEFField.new("deviceCustomNumber2Label",        key: "cn2Label",  ecs_field: "[cef][device_custom_number_2][label]"),
+      CEFField.new("deviceCustomNumber3",             key: "cn3",       ecs_field: "[cef][device_custom_number_3][value]"),
+      CEFField.new("deviceCustomNumber3Label",        key: "cn3Label",  ecs_field: "[cef][device_custom_number_3][label]"),
+      CEFField.new("deviceCustomString1",             key: "cs1",       ecs_field: "[cef][device_custom_string_1][value]"),
+      CEFField.new("deviceCustomString1Label",        key: "cs1Label",  ecs_field: "[cef][device_custom_string_1][label]"),
+      CEFField.new("deviceCustomString2",             key: "cs2",       ecs_field: "[cef][device_custom_string_2][value]"),
+      CEFField.new("deviceCustomString2Label",        key: "cs2Label",  ecs_field: "[cef][device_custom_string_2][label]"),
+      CEFField.new("deviceCustomString3",             key: "cs3",       ecs_field: "[cef][device_custom_string_3][value]"),
+      CEFField.new("deviceCustomString3Label",        key: "cs3Label",  ecs_field: "[cef][device_custom_string_3][label]"),
+      CEFField.new("deviceCustomString4",             key: "cs4",       ecs_field: "[cef][device_custom_string_4][value]"),
+      CEFField.new("deviceCustomString4Label",        key: "cs4Label",  ecs_field: "[cef][device_custom_string_4][label]"),
+      CEFField.new("deviceCustomString5",             key: "cs5",       ecs_field: "[cef][device_custom_string_5][value]"),
+      CEFField.new("deviceCustomString5Label",        key: "cs5Label",  ecs_field: "[cef][device_custom_string_5][label]"),
+      CEFField.new("deviceCustomString6",             key: "cs6",       ecs_field: "[cef][device_custom_string_6][value]"),
+      CEFField.new("deviceCustomString6Label",        key: "cs6Label",  ecs_field: "[cef][device_custom_string_6][label]"),
+      CEFField.new("deviceDirection",                                   ecs_field: "[network][direction]"),
+      CEFField.new("deviceDnsDomain",                                   ecs_field: "[#{@device}][registered_domain]", priority: 10),
+      CEFField.new("deviceEventCategory",             key: "cat",       ecs_field: "[cef][category]"),
+      CEFField.new("deviceExternalId",                                  ecs_field: (@device == 'host' ? "[host][id]" : "[observer][name]")),
+      CEFField.new("deviceFacility",                                    ecs_field: "[log][syslog][facility][code]"),
+      CEFField.new("deviceHostName",                  key: "dvchost",   ecs_field: (@device == 'host' ? '[host][name]' : '[observer][hostname]')),
+      CEFField.new("deviceInboundInterface",                            ecs_field: "[observer][ingress][interface][name]"),
+      CEFField.new("deviceMacAddress",                key: "dvcmac",    ecs_field: "[@device][mac]"),
+      CEFField.new("deviceNtDomain",                                    ecs_field: "[cef][nt_domain]"),
+      CEFField.new("deviceOutboundInterface",                           ecs_field: "[observer][egress][interface][name]"),
+      CEFField.new("devicePayloadId",                                   ecs_field: "[cef][payload_id]"),
+      CEFField.new("deviceProcessId",                 key: "dvcpid",    ecs_field: "[process][pid]"),
+      CEFField.new("deviceProcessName",                                 ecs_field: "[process][name]"),
+      CEFField.new("deviceReceiptTime",               key: "rt",        ecs_field: "@timestamp", normalize: :timestamp),
+      CEFField.new("deviceTimeZone",                  key: "dtz",       ecs_field: "[event][timezone]", legacy: "destinationTimeZone"),
+      CEFField.new("deviceTranslatedAddress",                           ecs_field: "[host][nat][ip]"),
+      CEFField.new("deviceTranslatedZoneExternalID",                    ecs_field: "[cef][translated_zone][external_id]"),
+      CEFField.new("deviceTranslatedZoneURI",                           ecs_field: "[cef][translated_zone][uri]"),
+      CEFField.new("deviceVersion",                                     ecs_field: "[observer][version]"),
+      CEFField.new("deviceZoneExternalID",                              ecs_field: "[cef][zone][external_id]"),
+      CEFField.new("deviceZoneURI",                                     ecs_field: "[cef][zone][uri]"),
+      CEFField.new("endTime",                         key: "end",       ecs_field: "[event][end]", normalize: :timestamp),
+      CEFField.new("eventId",                                           ecs_field: "[event][id]"),
+      CEFField.new("eventOutcome",                    key: "outcome",   ecs_field: "[event][outcome]"),
+      CEFField.new("externalId",                                        ecs_field: "[cef][external_id]"),
+      CEFField.new("fileCreateTime",                                    ecs_field: "[file][created]"),
+      CEFField.new("fileHash",                                          ecs_field: "[file][hash]]"),
+      CEFField.new("fileId",                                            ecs_field: "[file][inode]"),
+      CEFField.new("fileModificationTime",                              ecs_field: "[file][mtime]", normalize: :timestamp),
+      CEFField.new("fileName",                        key: "fname",     ecs_field: "[file][name]"),
+      CEFField.new("filePath",                                          ecs_field: "[file][path]"),
+      CEFField.new("filePermission",                                    ecs_field: "[file][group]"),
+      CEFField.new("fileSize",                        key: "fsize",     ecs_field: "[file][size]"),
+      CEFField.new("fileType",                                          ecs_field: "[file][extension]"),
+      CEFField.new("managerReceiptTime",              key: "mrt",       ecs_field: "[event][ingested]", normalize: :timestamp),
+      CEFField.new("message",                         key: "msg",       ecs_field: "[message]"),
+      CEFField.new("oldFileCreateTime",                                 ecs_field: "[cef][old_file][created]", normalize: :timestamp),
+      CEFField.new("oldFileHash",                                       ecs_field: "[cef][old_file][hash]"),
+      CEFField.new("oldFileId",                                         ecs_field: "[cef][old_file][inode]"),
+      CEFField.new("oldFileModificationTime",                           ecs_field: "[cef][old_file][mtime]", normalize: :timestamp),
+      CEFField.new("oldFileName",                                       ecs_field: "[cef][old_file][name]"),
+      CEFField.new("oldFilePath",                                       ecs_field: "[cef][old_file][path]"),
+      CEFField.new("oldFilePermission",                                 ecs_field: "[cef][old_file][group]"),
+      CEFField.new("oldFileSize",                                       ecs_field: "[cef][old_file][size]"),
+      CEFField.new("oldFileType",                                       ecs_field: "[cef][old_file][extension]"),
+      CEFField.new("rawEvent",                                          ecs_field: "[event][original]"),
+      CEFField.new("Reason",                          key: "reason",    ecs_field: "[event][reason]"),
+      CEFField.new("requestClientApplication",                          ecs_field: "[user_agent][original]"),
+      CEFField.new("requestContext",                                    ecs_field: "[http][request][referrer]"),
+      CEFField.new("requestCookies",                                    ecs_field: "[cef][request][cookies]"),
+      CEFField.new("requestMethod",                                     ecs_field: "[http][request][method]"),
+      CEFField.new("requestUrl",                      key: "request",   ecs_field: "[url][original]"),
+      CEFField.new("sourceAddress",                   key: "src",       ecs_field: "[source][ip]"),
+      CEFField.new("sourceDnsDomain",                                   ecs_field: "[source][registered_domain]", priority: 10),
+      CEFField.new("sourceGeoLatitude",               key: "slat",      ecs_field: "[source][geo][location][lat]", legacy: "sourceLatitude"),
+      CEFField.new("sourceGeoLongitude",              key: "slong",     ecs_field: "[source][geo][location][lon]", legacy: "sourceLongitude"),
+      CEFField.new("sourceHostName",                  key: "shost",     ecs_field: "[source][domain]"),
+      CEFField.new("sourceMacAddress",                key: "smac",      ecs_field: "[source][mac]"),
+      CEFField.new("sourceNtDomain",                  key: "sntdom",    ecs_field: "[source][registered_domain]"),
+      CEFField.new("sourcePort",                      key: "spt",       ecs_field: "[source][port]"),
+      CEFField.new("sourceProcessId",                 key: "spid",      ecs_field: "[source][process][pid]"),
+      CEFField.new("sourceProcessName",               key: "sproc",     ecs_field: "[source][process][name]"),
+      CEFField.new("sourceServiceName",                                 ecs_field: "[source][service][name]"),
+      CEFField.new("sourceTranslatedAddress",                           ecs_field: "[source][nat][ip]"),
+      CEFField.new("sourceTranslatedPort",                              ecs_field: "[source][nat][port]"),
+      CEFField.new("sourceTranslatedZoneExternalID",                    ecs_field: "[cef][source][translated_zone][external_id]"),
+      CEFField.new("sourceTranslatedZoneURI",                           ecs_field: "[cef][source][translated_zone][uri]"),
+      CEFField.new("sourceUserId",                    key: "suid",      ecs_field: "[source][user][id]"),
+      CEFField.new("sourceUserName",                  key: "suser",     ecs_field: "[source][user][name]"),
+      CEFField.new("sourceUserPrivileges",            key: "spriv",     ecs_field: "[source][user][group][name]"),
+      CEFField.new("sourceZoneExternalID",                              ecs_field: "[cef][source][zone][external_id]"),
+      CEFField.new("sourceZoneURI",                                     ecs_field: "[cef][source][zone][uri]"),
+      CEFField.new("startTime",                       key: "start",     ecs_field: "[event][start]", normalize: :timestamp),
+      CEFField.new("transportProtocol",               key: "proto",     ecs_field: "[network][transport]"),
+      CEFField.new("type",                                              ecs_field: "[cef][type]"),
+    ].sort_by(&:priority).each do |cef|
+      field_name = ecs_select[disabled:cef.name, v1:cef.ecs_field]
+
+      # whether the source is a cef_key or cef_name, normalize to field_name
+      decode_mapping[cef.key]  = field_name
+      decode_mapping[cef.name] = field_name
+
+      # whether source is a cef_name or a field_name, normalize to target
+      normalized_encode_target = @reverse_mapping ? cef.key : cef.name
+      encode_mapping[field_name] = normalized_encode_target
+      encode_mapping[cef.name]   = normalized_encode_target unless cef.name == field_name
+
+      # if a field has an alias, normalize pass-through
+      if cef.legacy
+        decode_mapping[cef.legacy] = ecs_select[disabled:cef.legacy, v1:cef.ecs_field]
+        encode_mapping[cef.legacy] = @reverse_mapping ? cef.key : cef.legacy
+      end
+
+      timestamp_fields << field_name if ecs_compatibility != :disabled && cef.normalize == :timestamp
+    end
+
+    @decode_mapping = decode_mapping.dup.freeze
+    @encode_mapping = encode_mapping.dup.freeze
+    @timestamp_fields = timestamp_fields.dup.freeze
+  end
+
   # Escape pipes and backslashes in the header. Equal signs are ok.
   # Newlines are forbidden.
   def sanitize_header_field(value)
@@ -392,17 +567,23 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
          .gsub(EXTENSION_VALUE_SANITIZER_PATTERN, EXTENSION_VALUE_SANITIZER_MAPPING)
   end
 
+  def normalize_timestamp(value, device_timezone_name)
+    value = @timestamp_normalzer.normalize(value, device_timezone_name).iso8601(9)
+
+    LogStash::Timestamp.new(value)
+  rescue => e
+    @logger.error("Failed to parse CEF timestamp value `#{value}` (#{e.message})")
+    raise InvalidTimestamp.new("Not a valid CEF timestamp: `#{value}`")
+  end
+
   def get_value(fieldname, event)
     val = event.get(fieldname)
 
     return nil if val.nil?
 
-    key = sanitize_extension_key(fieldname)
-    
-    if @reverse_mapping
-      key = REVERSE_MAPPINGS[key] || key
-    end
-    
+    key = @encode_mapping.fetch(fieldname, fieldname)
+    key = sanitize_extension_key(key)
+
     case val
     when Array, Hash
       return "#{key}=#{sanitize_extension_val(val.to_json)}"
