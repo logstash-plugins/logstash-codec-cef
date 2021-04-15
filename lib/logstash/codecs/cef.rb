@@ -449,7 +449,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       CEFField.new("deviceFacility",                                    ecs_field: "[log][syslog][facility][code]"),
       CEFField.new("deviceHostName",                  key: "dvchost",   ecs_field: (@device == 'host' ? '[host][name]' : '[observer][hostname]')),
       CEFField.new("deviceInboundInterface",                            ecs_field: "[observer][ingress][interface][name]"),
-      CEFField.new("deviceMacAddress",                key: "dvcmac",    ecs_field: "[@device][mac]"),
+      CEFField.new("deviceMacAddress",                key: "dvcmac",    ecs_field: "[#{@device}][mac]"),
       CEFField.new("deviceNtDomain",                                    ecs_field: "[cef][nt_domain]"),
       CEFField.new("deviceOutboundInterface",                           ecs_field: "[observer][egress][interface][name]"),
       CEFField.new("devicePayloadId",                                   ecs_field: "[cef][payload_id]"),
