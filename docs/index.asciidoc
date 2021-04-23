@@ -61,12 +61,13 @@ Because the CEF format allows ambiguous timestamp formats, some reasonable assum
    timezone (`dtz` or `deviceTimeZone` field), or fall through to this plugin's
    <<plugins-{type}s-{plugin}-default_timezone>>.
  - Localized timestamps are parsed using the provided <<plugins-{type}s-{plugin}-locale>>.
-
+[id="plugins-{type}s-{plugin}-field-mapping"]
 ===== Field mapping
 
-The header fields from each CEF payload is expanded to the following fields, depending on whether ECS is enabled:
+The header fields from each CEF payload is expanded to the following fields, depending on whether ECS is enabled.
 
-.Header field mapping
+[id="plugins-{type}s-{plugin}-header-field"]
+====== Header field mapping
 |=====
 |ECS Disabled | ECS Field
 
@@ -92,7 +93,8 @@ The following is a mapping between these fields.
 :cef-plugin-config-condition: pass:quotes[When plugin configured with]
 
 
-.Extension field mapping
+[id="plugins-{type}s-{plugin}-ext-field"]
+====== Extension field mapping
 |=======================================================================================================================
 |CEF Field Name (optional CEF Key)              |ECS Field
 
@@ -501,4 +503,3 @@ to help you build a new value from other parts of the event.
 When this codec is used in an Output Plugin, this option can be used to specify the
 value of the device version field in CEF header. The new value can include `%{foo}` strings
 to help you build a new value from other parts of the event.
-
