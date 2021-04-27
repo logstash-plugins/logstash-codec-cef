@@ -1,3 +1,7 @@
+## 6.2.1
+ - Added field mapping to docs.
+ - Fixed ECS mapping of `deviceMacAddress` field.
+
 ## 6.2.0
  - Introduce ECS Compatibility mode [#83](https://github.com/logstash-plugins/logstash-codec-cef/pull/83).
 
