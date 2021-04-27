@@ -61,6 +61,7 @@ Because the CEF format allows ambiguous timestamp formats, some reasonable assum
    timezone (`dtz` or `deviceTimeZone` field), or fall through to this plugin's
    <<plugins-{type}s-{plugin}-default_timezone>>.
  - Localized timestamps are parsed using the provided <<plugins-{type}s-{plugin}-locale>>.
+
 [id="plugins-{type}s-{plugin}-field-mapping"]
 ===== Field mapping
 
