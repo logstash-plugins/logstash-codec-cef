@@ -1,5 +1,6 @@
 ## 6.2.2
  - Fixed invalid Field Reference that could occur when ECS mode was enabled and the CEF field `fileHash` was parsed.
+ - Added expanded mapping for numbered `deviceCustom*` and `deviceCustom*Label` fields so that all now include numbers 1 through 15.
 
 ## 6.2.1
  - Added field mapping to docs.

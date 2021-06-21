@@ -788,6 +788,21 @@ describe LogStash::Codecs::CEF do
         end
       end
 
+      let(:log_with_custom_typed_fields) { "Syslogdate Sysloghost CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|cfp15=3.1415926 cfp15Label=pi c6a12=::1 c6a12Label=localhost cn7=8191 cn7Label=mersenne cs4=silly cs4Label=theory" }
+      it 'decodes to mapped numbered fields' do
+        decode_one(subject, log_with_custom_typed_fields) do |e|
+          validate(e)
+          insist { e.get(ecs_select[disabled: "deviceCustomFloatingPoint15",      v1: "[cef][device_custom_floating_point_15][value]"]) } == "3.1415926"
+          insist { e.get(ecs_select[disabled: "deviceCustomFloatingPoint15Label", v1: "[cef][device_custom_floating_point_15][label]"]) } == "pi"
+          insist { e.get(ecs_select[disabled: "deviceCustomIPv6Address12",        v1: "[cef][device_custom_ipv6_address_12][value]"]) } == "::1"
+          insist { e.get(ecs_select[disabled: "deviceCustomIPv6Address12Label",   v1: "[cef][device_custom_ipv6_address_12][label]"]) } == "localhost"
+          insist { e.get(ecs_select[disabled: "deviceCustomNumber7",              v1: "[cef][device_custom_number_7][value]"]) } == "8191"
+          insist { e.get(ecs_select[disabled: "deviceCustomNumber7Label",         v1: "[cef][device_custom_number_7][label]"]) } == "mersenne"
+          insist { e.get(ecs_select[disabled: "deviceCustomString4",              v1: "[cef][device_custom_string_4][value]"]) } == "silly"
+          insist { e.get(ecs_select[disabled: "deviceCustomString4Label",         v1: "[cef][device_custom_string_4][label]"]) } == "theory"
+        end
+      end
+
       context 'with UTF-8 message' do
         let(:message) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=192.168.1.11 target=aaaaaああああaaaa msg=Description Omitted' }
 
