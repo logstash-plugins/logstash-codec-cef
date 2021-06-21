@@ -780,6 +780,14 @@ describe LogStash::Codecs::CEF do
         end
       end
 
+      let(:log_with_fileHash) { "Syslogdate Sysloghost CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|fileHash=1bad1dea" }
+      it 'decodes fileHash to [file][hash]' do
+        decode_one(subject, log_with_fileHash) do |e|
+          validate(e)
+          insist { e.get(ecs_select[disabled:"fileHash", v1:"[file][hash]"]) } == "1bad1dea"
+        end
+      end
+
       context 'with UTF-8 message' do
         let(:message) { 'CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=192.168.1.11 target=aaaaaああああaaaa msg=Description Omitted' }
 

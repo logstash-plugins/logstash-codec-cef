@@ -242,7 +242,7 @@ The following is a mapping between these fields.
 |`eventOutcome` (`outcome`)                     |`[event][outcome]`
 |`externalId`                                   |`[cef][external_id]`
 |`fileCreateTime`                               |`[file][created]`
-|`fileHash`                                     |`[file][hash]]`
+|`fileHash`                                     |`[file][hash]`
 |`fileId`                                       |`[file][inode]`
 |`fileModificationTime`                         |`[file][mtime]`
 

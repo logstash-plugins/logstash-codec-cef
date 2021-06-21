@@ -468,7 +468,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
       CEFField.new("eventOutcome",                    key: "outcome",   ecs_field: "[event][outcome]"),
       CEFField.new("externalId",                                        ecs_field: "[cef][external_id]"),
       CEFField.new("fileCreateTime",                                    ecs_field: "[file][created]"),
-      CEFField.new("fileHash",                                          ecs_field: "[file][hash]]"),
+      CEFField.new("fileHash",                                          ecs_field: "[file][hash]"),
       CEFField.new("fileId",                                            ecs_field: "[file][inode]"),
       CEFField.new("fileModificationTime",                              ecs_field: "[file][mtime]", normalize: :timestamp),
       CEFField.new("fileName",                        key: "fname",     ecs_field: "[file][name]"),

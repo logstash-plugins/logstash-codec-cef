@@ -1,3 +1,6 @@
+## 6.2.2
+ - Fixed invalid Field Reference that could occur when ECS mode was enabled and the CEF field `fileHash` was parsed.
+
 ## 6.2.1
  - Added field mapping to docs.
  - Fixed ECS mapping of `deviceMacAddress` field.
