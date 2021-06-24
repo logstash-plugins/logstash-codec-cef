@@ -484,9 +484,7 @@ If the codec handles data from a variety of sources, the ECS recommendation is t
 ** When Logstash provides a `pipeline.ecs_compatibility` setting, its value is used as the default
 ** Otherwise, the default value is `disabled`.
 
-Controls this plugin's compatibility with the
-{ecs-ref}[Elastic Common Schema (ECS)]
-(ECS)].
+Controls this plugin's compatibility with the {ecs-ref}[Elastic Common Schema (ECS)].
 
 [id="plugins-{type}s-{plugin}-fields"]
 ===== `fields` 
