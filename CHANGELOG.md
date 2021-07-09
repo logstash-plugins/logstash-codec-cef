@@ -1,16 +1,16 @@
 ## 6.2.2
  - Fixed invalid Field Reference that could occur when ECS mode was enabled and the CEF field `fileHash` was parsed.
- - Added expanded mapping for numbered `deviceCustom*` and `deviceCustom*Label` fields so that all now include numbers 1 through 15.
+ - Added expanded mapping for numbered `deviceCustom*` and `deviceCustom*Label` fields so that all now include numbers 1 through 15. [#89](https://github.com/logstash-plugins/logstash-codec-cef/pull/89).
 
 ## 6.2.1
  - Added field mapping to docs.
- - Fixed ECS mapping of `deviceMacAddress` field.
+ - Fixed ECS mapping of `deviceMacAddress` field. [#88](https://github.com/logstash-plugins/logstash-codec-cef/pull/88).
 
 ## 6.2.0
  - Introduce ECS Compatibility mode [#83](https://github.com/logstash-plugins/logstash-codec-cef/pull/83).
 
 ## 6.1.2
- - Added error log with full payload when something bad happens in decoding a message[#84](https://github.com/logstash-plugins/logstash-codec-cef/pull/84)
+ - Added error log with full payload when something bad happens in decoding a message [#84](https://github.com/logstash-plugins/logstash-codec-cef/pull/84)
 
 ## 6.1.1
  - Improved encoding performance, especially when encoding many extension fields [#81](https://github.com/logstash-plugins/logstash-codec-cef/pull/81)
