@@ -6,6 +6,7 @@ require "json"
 require "time"
 
 require 'logstash/plugin_mixins/ecs_compatibility_support'
+require 'logstash/plugin_mixins/event_support/event_factory_adapter'
 
 # Implementation of a Logstash codec for the ArcSight Common Event Format (CEF)
 # Based on Revision 20 of Implementing ArcSight CEF, dated from June 05, 2013
@@ -16,7 +17,8 @@ require 'logstash/plugin_mixins/ecs_compatibility_support'
 class LogStash::Codecs::CEF < LogStash::Codecs::Base
   config_name "cef"
 
-  include LogStash::PluginMixins::ECSCompatibilitySupport(:disabled, :v1)
+  include LogStash::PluginMixins::ECSCompatibilitySupport(:disabled, :v1, :v8 => :v1)
+  include LogStash::PluginMixins::EventSupport::EventFactoryAdapter
 
   InvalidTimestamp = Class.new(StandardError)
 
@@ -201,7 +203,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
   def handle(data, &block)
     original_data = data.dup
-    event = LogStash::Event.new
+    event = event_factory.new_event
     event.set(raw_data_field, data) unless raw_data_field.nil?
 
     @utf8_charset.convert(data)
@@ -282,7 +284,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   rescue => e
     @logger.error("Failed to decode CEF payload. Generating failure event with payload in message field.",
                   :exception => e.class, :message => e.message, :backtrace => e.backtrace, :original_data => original_data)
-    yield LogStash::Event.new("message" => data, "tags" => ["_cefparsefailure"])
+    yield event_factory.new_event("message" => data, "tags" => ["_cefparsefailure"])
   end
 
   public
