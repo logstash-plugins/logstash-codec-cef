@@ -441,7 +441,7 @@ not include timezone information, this `default_timezone` is used instead.
 If your input puts a delimiter between each CEF event, you'll want to set
 this to be that delimiter.
 
-For example, with the TCP input, you probably want to put this:
+Note: Byte stream inputs such as TCP require delimiter to be specified. Otherwise input can be truncated or incorrectly split.
 
     input {
       tcp {
