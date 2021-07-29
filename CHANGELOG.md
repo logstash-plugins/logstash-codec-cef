@@ -1,3 +1,6 @@
+## 6.2.3
+  - Feat: event_factory support [#94](https://github.com/logstash-plugins/logstash-codec-cef/pull/94)
+
 ## 6.2.2
  - Fixed invalid Field Reference that could occur when ECS mode was enabled and the CEF field `fileHash` was parsed.
  - Added expanded mapping for numbered `deviceCustom*` and `deviceCustom*Label` fields so that all now include numbers 1 through 15. [#89](https://github.com/logstash-plugins/logstash-codec-cef/pull/89).
