@@ -1,3 +1,6 @@
+## 6.2.4
+  - [DOC] Emphasize importance of delimiter setting for byte stream inputs [#95](https://github.com/logstash-plugins/logstash-codec-cef/pull/95)
+
 ## 6.2.3
   - Feat: event_factory support [#94](https://github.com/logstash-plugins/logstash-codec-cef/pull/94)
 
