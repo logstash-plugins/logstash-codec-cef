@@ -443,12 +443,17 @@ this to be that delimiter.
 
 NOTE: Byte stream inputs such as TCP require delimiter to be specified. Otherwise input can be truncated or incorrectly split.
 
+**Example**
+
+[source,ruby]
+-----
     input {
       tcp {
         codec => cef { delimiter => "\r\n" }
         # ...
       }
     }
+-----
 
 This setting allows the following character sequences to have special meaning:
 
