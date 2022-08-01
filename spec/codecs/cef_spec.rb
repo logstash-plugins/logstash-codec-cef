@@ -548,6 +548,23 @@ describe LogStash::Codecs::CEF do
         end
       end
 
+      let(:literal_newline)         { "\n" }
+      let(:literal_carriage_return) { "\r" }
+      let(:literal_equals)          { "=" }
+      let(:literal_backslash)       { "\\" }
+      let(:escaped_newline)         { literal_backslash + 'n' }
+      let(:escaped_carriage_return) { literal_backslash + 'r' }
+      let(:escaped_equals)          { literal_backslash + literal_equals }
+      let(:escaped_backslash)       { literal_backslash + literal_backslash }
+      let(:escaped_sequences_in_extension_value) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|foo=bar msg=this message has escaped equals #{escaped_equals} and escaped newlines #{escaped_newline} escaped carriage returns #{escaped_carriage_return} and escaped backslashes #{escaped_backslash} in it bar=baz" }
+      it "decodes embedded newlines, carriage regurns, backslashes, and equals signs" do
+        decode_one(subject, escaped_sequences_in_extension_value) do |e|
+          insist { e.get("foo") } == 'bar'
+          insist { e.get("message") } == "this message has escaped equals #{literal_equals} and escaped newlines #{literal_newline} escaped carriage returns #{literal_carriage_return} and escaped backslashes #{literal_backslash} in it"
+          insist { e.get("bar") } == 'baz'
+        end
+      end
+
       context "zoneless deviceReceiptTime(rt) when deviceTimeZone(dtz) is provided" do
         let(:cef_formatted_timestamp) { 'Jul 19 2017 10:50:21.127' }
         let(:zone_name) { 'Europe/Moscow' }

@@ -108,9 +108,6 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # Cache of a gsub pattern that matches a backslash-escaped backslash or backslash-escaped pipe, _capturing_ the escaped character
   HEADER_ESCAPE_CAPTURE = /\\([\\|])/
 
-  # Cache of a gsub pattern that matches a backslash-escaped backslash or backslash-escaped equals, _capturing_ the escaped character
-  EXTENSION_VALUE_ESCAPE_CAPTURE = /\\([\\=])/
-
   # While the original CEF spec calls out that extension keys must be alphanumeric and must not contain spaces,
   # in practice many "CEF" producers like the Arcsight smart connector produce non-legal keys including underscores,
   # commas, periods, and square-bracketed index offsets.
@@ -160,9 +157,29 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     "="  => "\\=",
     "\n" => "\\n",
     "\r" => "\\n",
-  }
+  }.freeze
   EXTENSION_VALUE_SANITIZER_PATTERN = Regexp.union(EXTENSION_VALUE_SANITIZER_MAPPING.keys)
   private_constant :EXTENSION_VALUE_SANITIZER_MAPPING, :EXTENSION_VALUE_SANITIZER_PATTERN
+
+
+  LITERAL_BACKSLASH = "\\".freeze
+  private_constant :LITERAL_BACKSLASH
+  LITERAL_NEWLINE = "\n".freeze
+  private_constant :LITERAL_NEWLINE
+  LITERAL_CARRIAGE_RETURN = "\r".freeze
+  private_constant :LITERAL_CARRIAGE_RETURN
+
+  ##
+  # @see CEF#desanitize_extension_val
+  EXTENSION_VALUE_SANITIZER_REVERSE_MAPPING = {
+    LITERAL_BACKSLASH+LITERAL_BACKSLASH => LITERAL_BACKSLASH,
+    LITERAL_BACKSLASH+'=' => '=',
+    LITERAL_BACKSLASH+'n' => LITERAL_NEWLINE,
+    LITERAL_BACKSLASH+'r' => LITERAL_CARRIAGE_RETURN,
+  }.freeze
+  EXTENSION_VALUE_SANITIZER_REVERSE_PATTERN = Regexp.union(EXTENSION_VALUE_SANITIZER_REVERSE_MAPPING.keys)
+  private_constant :EXTENSION_VALUE_SANITIZER_REVERSE_MAPPING, :EXTENSION_VALUE_SANITIZER_REVERSE_PATTERN
+
 
   CEF_PREFIX = 'CEF:'.freeze
 
@@ -260,7 +277,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
         extension_field_key = extension_field_key.sub(EXTENSION_KEY_ARRAY_CAPTURE, '[\1]\2') if extension_field_key.end_with?(']')
 
         # process legal extension field value escapes
-        extension_field_value = raw_extension_field_value.gsub(EXTENSION_VALUE_ESCAPE_CAPTURE, '\1')
+        extension_field_value = desanitize_extension_val(raw_extension_field_value)
 
         extension_fields[extension_field_key] = extension_field_value
       end
@@ -545,6 +562,10 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     value.to_s
          .gsub("\r\n", "\n")
          .gsub(EXTENSION_VALUE_SANITIZER_PATTERN, EXTENSION_VALUE_SANITIZER_MAPPING)
+  end
+
+  def desanitize_extension_val(value)
+    value.to_s.gsub(EXTENSION_VALUE_SANITIZER_REVERSE_PATTERN, EXTENSION_VALUE_SANITIZER_REVERSE_MAPPING)
   end
 
   def normalize_timestamp(value, device_timezone_name)
