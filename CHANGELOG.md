@@ -1,3 +1,6 @@
+## 6.2.6
+ - Fix: when decoding, escaped newlines and carriage returns in extension values are now correctly decoded into literal newlines and carriage returns respectively [#98](https://github.com/logstash-plugins/logstash-codec-cef/pull/98)
+
 ## 6.2.5
   - [DOC] Update link to CEF implementation guide [#97](https://github.com/logstash-plugins/logstash-codec-cef/pull/97)
 
