@@ -409,14 +409,16 @@ describe LogStash::Codecs::CEF do
     # @yieldparam event [Event]
     # @yieldreturn [void]
     # @return [Event]
-    def decode_one(codec, data)
+    def decode_one(codec, data, &block)
       events = do_decode(codec, data)
       fail("Expected one event, got #{events.size} events: #{events.inspect}") unless events.size == 1
       event = events.first
 
-      if block_given?
-        aggregate_failures('decode one') do
-          yield event
+      if block
+        enriched_event_validation(event) do |e|
+          aggregate_failures('decode one') do
+            yield e
+          end
         end
       end
 
@@ -434,15 +436,31 @@ describe LogStash::Codecs::CEF do
     # @yieldparam event [Event]
     # @yieldreturn [void]
     # @return [Array<Event>]
-    def do_decode(codec, data)
+    def do_decode(codec, data, &block)
       events = []
       codec.decode(data) do |event|
         events << event
       end
 
-      events.each { |event| yield event } if block_given?
+      if block
+        events.each do |event|
+          enriched_event_validation(event, &block)
+        end
+      end
 
       events
+    end
+
+    ##
+    # Enrich event validation by outputting the serialized event to stderr
+    # if-and-only-if the provided block's rspec expectations are not met.
+    #
+    # @param event [#to_hash_with_metadata]
+    def enriched_event_validation(event)
+      yield(event)
+    rescue RSpec::Expectations::ExpectationNotMetError
+      $stderr.puts("\e[35m#{event.to_hash_with_metadata}\e[0m\n")
+      raise
     end
   end
 
@@ -474,6 +492,77 @@ describe LogStash::Codecs::CEF do
             validate(e)
             insist { e.get(ecs_select[disabled: "deviceVendor", v1:"[observer][vendor]"]) } == "security"
             insist { e.get(ecs_select[disabled: "deviceProduct", v1:"[observer][product]"]) } == "threatmanager"
+          end
+        end
+      end
+
+      # CEF requires seven pipe-terminated headers before optional extensions
+      context 'with a non-CEF payload' do
+        let(:logger_stub) { double('Logger').as_null_object }
+        before(:each) do
+          allow_any_instance_of(described_class).to receive(:logger).and_return(logger_stub)
+        end
+
+        context 'containing 0 header-like sections' do
+          let(:message) { 'this is not cef' }
+          it 'logs helpfully and produces a tagged event' do
+            do_decode(subject,message) do |event|
+              expect(event.get('tags')).to include('_cefparsefailure')
+              expect(event.get('message')).to eq(message)
+            end
+            expect(logger_stub).to have_received(:error)
+                                     .with(a_string_including('Failed to decode CEF payload. Generating failure event with payload in message field'),
+                                           a_hash_including(exception: a_string_including("found 0 of 7 required pipe-terminated header fields"),
+                                                            original_data: message))
+          end
+        end
+        context 'containing 4 header-like sections' do
+          let(:message) { "a|b|c with several \\| escaped\\| pipes|d|bananas" }
+          it 'logs helpfully and produces a tagged event' do
+            do_decode(subject,message) do |event|
+              expect(event.get('tags')).to include('_cefparsefailure')
+              expect(event.get('message')).to eq(message)
+            end
+            expect(logger_stub).to have_received(:error)
+                                     .with(a_string_including('Failed to decode CEF payload. Generating failure event with payload in message field'),
+                                           a_hash_including(exception: a_string_including("found 4 of 7 required pipe-terminated header fields"),
+                                                            original_data: message))
+          end
+        end
+        context 'containing non-key/value extensions' do
+          let (:message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|this is in the extensions space but it is not valid because it is not equals-separated key/value" }
+          it 'logs helpfully and produces a tagged event' do
+            do_decode(subject,message) do |event|
+              expect(event.get('tags')).to include('_cefparsefailure')
+              expect(event.get('message')).to eq(message)
+            end
+            expect(logger_stub).to have_received(:error)
+                                     .with(a_string_including('Failed to decode CEF payload. Generating failure event with payload in message field'),
+                                           a_hash_including(exception: a_string_including("invalid extensions; keyless value present"),
+                                                            original_data: message))
+          end
+        end
+        context 'containing unescaped newlines' do
+          # when not using a `delimiter`, we expect exactly one CEF log per call to decode.
+          let (:message) {
+            <<~EOMESSAGE
+              CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.67
+              CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.67
+              CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.67
+              CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.67
+              CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.67
+            EOMESSAGE
+          }
+          it 'logs helpfully and produces a tagged event' do
+            do_decode(subject, message) do |event|
+              expect(event.get('tags')).to include('_cefparsefailure')
+              expect(event.get('message')).to eq(message)
+            end
+            expect(logger_stub).to have_received(:error)
+                                     .with(a_string_including('Failed to decode CEF payload. Generating failure event with payload in message field'),
+                                           a_hash_including(exception: a_string_including("message is not valid CEF because it contains unescaped newline characters",
+                                                                                          "use the `delimiter` setting to enable in-codec buffering and delimiter-splitting"),
+                                                            original_data: message))
           end
         end
       end

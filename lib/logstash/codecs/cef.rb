@@ -102,8 +102,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   #  - non-pipe characters
   HEADER_PATTERN = /(?:\\\||\\\\|[^|])*?/
 
-  # Cache of a scanner pattern that _captures_ a HEADER followed by an unescaped pipe
-  HEADER_SCANNER = /(#{HEADER_PATTERN})#{Regexp.quote('|')}/
+  # Cache of a scanner pattern that _captures_ a HEADER followed by EOF or an unescaped pipe
+  HEADER_NEXT_FIELD_PATTERN = /(#{HEADER_PATTERN})#{Regexp.quote('|')}/
 
   # Cache of a gsub pattern that matches a backslash-escaped backslash or backslash-escaped pipe, _capturing_ the escaped character
   HEADER_ESCAPE_CAPTURE = /\\([\\|])/
@@ -136,8 +136,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # - runs of whitespace that are NOT followed by something that looks like a key-equals sequence
   EXTENSION_VALUE_PATTERN = /(?:\S|\s++(?!#{EXTENSION_KEY_PATTERN}=))*/
 
-  # Cache of a scanner pattern that _captures_ extension field key/value pairs
-  EXTENSION_KEY_VALUE_SCANNER = /(#{EXTENSION_KEY_PATTERN})=(#{EXTENSION_VALUE_PATTERN})\s*/
+  # Cache of a pattern that _captures_ the NEXT extension field key/value pair
+  EXTENSION_NEXT_KEY_VALUE_PATTERN = /^(#{EXTENSION_KEY_PATTERN})=(#{EXTENSION_VALUE_PATTERN})\s*/
 
   ##
   # @see CEF#sanitize_header_field
@@ -235,10 +235,16 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     end
 
     # Use a scanning parser to capture the HEADER_FIELDS
-    unprocessed_data = data
-    @header_fields.each do |field_name|
-      match_data = HEADER_SCANNER.match(unprocessed_data)
-      break if match_data.nil? # missing fields
+    unprocessed_data = data.chomp
+    if unprocessed_data.include?(LITERAL_NEWLINE)
+      fail("message is not valid CEF because it contains unescaped newline characters; " +
+           "use the `delimiter` setting to enable in-codec buffering and delimiter-splitting")
+    end
+    @header_fields.each_with_index do |field_name, idx|
+      match_data = HEADER_NEXT_FIELD_PATTERN.match(unprocessed_data)
+      if match_data.nil?
+        fail("message is not valid CEF; found #{idx} of 7 required pipe-terminated header fields")
+      end
 
       escaped_field_value = match_data[1]
       next if escaped_field_value.nil?
@@ -265,11 +271,14 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     event.set(cef_version_field, delete_cef_prefix(event.get(cef_version_field)))
 
     # Use a scanning parser to capture the Extension Key/Value Pairs
-    if message && message.include?('=')
+    if message && !message.empty?
       message = message.strip
       extension_fields = {}
 
-      message.scan(EXTENSION_KEY_VALUE_SCANNER) do |extension_field_key, raw_extension_field_value|
+      while (match = message.match(EXTENSION_NEXT_KEY_VALUE_PATTERN))
+        extension_field_key, raw_extension_field_value = match.captures
+        message = match.post_match
+
         # expand abbreviated extension field keys
         extension_field_key = @decode_mapping.fetch(extension_field_key, extension_field_key)
 
@@ -280,6 +289,9 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
         extension_field_value = desanitize_extension_val(raw_extension_field_value)
 
         extension_fields[extension_field_key] = extension_field_value
+      end
+      if !message.empty?
+        fail("invalid extensions; keyless value present `#{message}`")
       end
 
       # in ECS mode, normalize timestamps including timezone.
@@ -300,7 +312,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     yield event
   rescue => e
     @logger.error("Failed to decode CEF payload. Generating failure event with payload in message field.",
-                  :exception => e.class, :message => e.message, :backtrace => e.backtrace, :original_data => original_data)
+                  log_metadata(:original_data => original_data))
     yield event_factory.new_event("message" => data, "tags" => ["_cefparsefailure"])
   end
 
@@ -347,6 +359,19 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     ].map(&:freeze).freeze
     # the @syslog_header is the field name used when a syslog header preceeds the CEF Version.
     @syslog_header = ecs_select[disabled:'syslog',v1:'[log][syslog][header]']
+  end
+
+  ##
+  # produces log metadata, injecting the current exception and log-level-relevant backtraces
+  # @param context [Hash{Symbol=>Object}]: the base context
+  def log_metadata(context={})
+    return context unless $!
+
+    exception_context = {}
+    exception_context[:exception] = "#{$!.class}: #{$!.message}"
+    exception_context[:backtrace] = $!.backtrace if @logger.debug?
+
+    exception_context.merge(context)
   end
 
   class CEFField
