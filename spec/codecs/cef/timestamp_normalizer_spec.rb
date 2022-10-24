@@ -159,7 +159,6 @@ describe LogStash::Codecs::CEF::TimestampNormalizer do
       context 'and handling a yearless date string from mid january' do
         let(:time_to_parse) { Time.parse("2021-01-17T00:00:08.123456789Z") }
         it 'assumes that the date being parsed is in the distant past' do
-          $stderr.puts(parsable_string)
           expect(parsed_result.month).to eq(1)
           expect(parsed_result.year).to eq(time_of_parse.year)
         end
