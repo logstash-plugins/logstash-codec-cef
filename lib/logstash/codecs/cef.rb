@@ -210,11 +210,21 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   public
   def decode(data, &block)
     if @delimiter
+      @logger.trace("Buffering #{data.bytesize}B of data") if @logger.trace?
       @buffer.extract(data).each do |line|
+        @logger.trace("Decoding #{line.bytesize + @delimiter.bytesize}B of buffered data") if @logger.trace?
         handle(line, &block)
       end
     else
+      @logger.trace("Decoding #{data.bytesize}B of unbuffered data") if @logger.trace?
       handle(data, &block)
+    end
+  end
+
+  def flush(&block)
+    if @delimiter && (remainder = @buffer.flush)
+      @logger.trace("Flushing #{remainder.bytesize}B of buffered data") if @logger.trace?
+      handle(remainder, &block) unless remainder.empty?
     end
   end
 

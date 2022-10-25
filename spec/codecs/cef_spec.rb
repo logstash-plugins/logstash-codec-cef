@@ -409,8 +409,8 @@ describe LogStash::Codecs::CEF do
     # @yieldparam event [Event]
     # @yieldreturn [void]
     # @return [Event]
-    def decode_one(codec, data, &block)
-      events = do_decode(codec, data)
+    def decode_one(codec, data, flush: true, &block)
+      events = do_decode(codec, data, flush: flush)
       fail("Expected one event, got #{events.size} events: #{events.inspect}") unless events.size == 1
       event = events.first
 
@@ -436,9 +436,12 @@ describe LogStash::Codecs::CEF do
     # @yieldparam event [Event]
     # @yieldreturn [void]
     # @return [Array<Event>]
-    def do_decode(codec, data, &block)
+    def do_decode(codec, data, flush: true, &block)
       events = []
       codec.decode(data) do |event|
+        events << event
+      end
+      flush && codec.flush do |event|
         events << event
       end
 
@@ -470,7 +473,7 @@ describe LogStash::Codecs::CEF do
         allow_any_instance_of(described_class).to receive(:ecs_compatibility).and_return(ecs_compatibility)
       end
 
-      let (:message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+      let(:message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
 
       include DecodeHelpers
 
@@ -483,15 +486,53 @@ describe LogStash::Codecs::CEF do
         # Related: https://github.com/elastic/logstash/issues/1645
         subject(:codec) { LogStash::Codecs::CEF.new("delimiter" => '\r\n') }
 
+        let(:message_two) { "CEF:0|fun|whimsy|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+
+        # testing implicit flush when
         it "should parse on the delimiter " do
-          do_decode(subject,message) do |e|
+          do_decode(subject, message, flush: false) do |e|
             raise Exception.new("Should not get here. If we do, it means the decoder emitted an event before the delimiter was seen?")
           end
 
-          decode_one(subject, "\r\n") do |e|
+          # the delimiter's presence flushes what we already received, but not the new bytes we send
+          decode_one(subject, "\r\n#{message_two}", flush: false) do |e|
             validate(e)
             insist { e.get(ecs_select[disabled: "deviceVendor", v1:"[observer][vendor]"]) } == "security"
             insist { e.get(ecs_select[disabled: "deviceProduct", v1:"[observer][product]"]) } == "threatmanager"
+          end
+
+          # allowing a flush emits the buffered event with our new bits appended
+          decode_one(subject, " split=perfect", flush: true) do |e|
+            validate(e)
+            insist { e.get(ecs_select[disabled: "deviceVendor", v1:"[observer][vendor]"]) } == "fun"
+            insist { e.get(ecs_select[disabled: "deviceProduct", v1:"[observer][product]"]) } == "whimsy"
+            insist { e.get("split") } == "perfect"
+          end
+        end
+
+        it 'flushes on close' do
+          # message does NOT have delimiter, but we still get our event
+          decode_one(subject, message, flush: true) do |e|
+            validate(e)
+            insist { e.get(ecs_select[disabled: "deviceVendor", v1:"[observer][vendor]"]) } == "security"
+            insist { e.get(ecs_select[disabled: "deviceProduct", v1:"[observer][product]"]) } == "threatmanager"
+          end
+        end
+
+        it 'emits multiple from a single decode operation' do
+          events = do_decode(subject, "#{message}\r\n#{message_two}")
+          expect(events.size).to eq(2)
+
+          enriched_event_validation(events[0]) do |event|
+            validate(event)
+            insist { event.get(ecs_select[disabled: "deviceVendor", v1:"[observer][vendor]"]) } == "security"
+            insist { event.get(ecs_select[disabled: "deviceProduct", v1:"[observer][product]"]) } == "threatmanager"
+          end
+
+          enriched_event_validation(events[1]) do |event|
+            validate(event)
+            insist { event.get(ecs_select[disabled: "deviceVendor", v1:"[observer][vendor]"]) } == "fun"
+            insist { event.get(ecs_select[disabled: "deviceProduct", v1:"[observer][product]"]) } == "whimsy"
           end
         end
       end
