@@ -102,14 +102,11 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   #  - non-pipe characters
   HEADER_PATTERN = /(?:\\\||\\\\|[^|])*?/
 
-  # Cache of a scanner pattern that _captures_ a HEADER followed by an unescaped pipe
-  HEADER_SCANNER = /(#{HEADER_PATTERN})#{Regexp.quote('|')}/
+  # Cache of a scanner pattern that _captures_ a HEADER followed by EOF or an unescaped pipe
+  HEADER_NEXT_FIELD_PATTERN = /(#{HEADER_PATTERN})#{Regexp.quote('|')}/
 
   # Cache of a gsub pattern that matches a backslash-escaped backslash or backslash-escaped pipe, _capturing_ the escaped character
   HEADER_ESCAPE_CAPTURE = /\\([\\|])/
-
-  # Cache of a gsub pattern that matches a backslash-escaped backslash or backslash-escaped equals, _capturing_ the escaped character
-  EXTENSION_VALUE_ESCAPE_CAPTURE = /\\([\\=])/
 
   # While the original CEF spec calls out that extension keys must be alphanumeric and must not contain spaces,
   # in practice many "CEF" producers like the Arcsight smart connector produce non-legal keys including underscores,
@@ -139,8 +136,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   # - runs of whitespace that are NOT followed by something that looks like a key-equals sequence
   EXTENSION_VALUE_PATTERN = /(?:\S|\s++(?!#{EXTENSION_KEY_PATTERN}=))*/
 
-  # Cache of a scanner pattern that _captures_ extension field key/value pairs
-  EXTENSION_KEY_VALUE_SCANNER = /(#{EXTENSION_KEY_PATTERN})=(#{EXTENSION_VALUE_PATTERN})\s*/
+  # Cache of a pattern that _captures_ the NEXT extension field key/value pair
+  EXTENSION_NEXT_KEY_VALUE_PATTERN = /^(#{EXTENSION_KEY_PATTERN})=(#{EXTENSION_VALUE_PATTERN})\s*/
 
   ##
   # @see CEF#sanitize_header_field
@@ -160,9 +157,29 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     "="  => "\\=",
     "\n" => "\\n",
     "\r" => "\\n",
-  }
+  }.freeze
   EXTENSION_VALUE_SANITIZER_PATTERN = Regexp.union(EXTENSION_VALUE_SANITIZER_MAPPING.keys)
   private_constant :EXTENSION_VALUE_SANITIZER_MAPPING, :EXTENSION_VALUE_SANITIZER_PATTERN
+
+
+  LITERAL_BACKSLASH = "\\".freeze
+  private_constant :LITERAL_BACKSLASH
+  LITERAL_NEWLINE = "\n".freeze
+  private_constant :LITERAL_NEWLINE
+  LITERAL_CARRIAGE_RETURN = "\r".freeze
+  private_constant :LITERAL_CARRIAGE_RETURN
+
+  ##
+  # @see CEF#desanitize_extension_val
+  EXTENSION_VALUE_SANITIZER_REVERSE_MAPPING = {
+    LITERAL_BACKSLASH+LITERAL_BACKSLASH => LITERAL_BACKSLASH,
+    LITERAL_BACKSLASH+'=' => '=',
+    LITERAL_BACKSLASH+'n' => LITERAL_NEWLINE,
+    LITERAL_BACKSLASH+'r' => LITERAL_CARRIAGE_RETURN,
+  }.freeze
+  EXTENSION_VALUE_SANITIZER_REVERSE_PATTERN = Regexp.union(EXTENSION_VALUE_SANITIZER_REVERSE_MAPPING.keys)
+  private_constant :EXTENSION_VALUE_SANITIZER_REVERSE_MAPPING, :EXTENSION_VALUE_SANITIZER_REVERSE_PATTERN
+
 
   CEF_PREFIX = 'CEF:'.freeze
 
@@ -193,11 +210,21 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   public
   def decode(data, &block)
     if @delimiter
+      @logger.trace("Buffering #{data.bytesize}B of data") if @logger.trace?
       @buffer.extract(data).each do |line|
+        @logger.trace("Decoding #{line.bytesize + @delimiter.bytesize}B of buffered data") if @logger.trace?
         handle(line, &block)
       end
     else
+      @logger.trace("Decoding #{data.bytesize}B of unbuffered data") if @logger.trace?
       handle(data, &block)
+    end
+  end
+
+  def flush(&block)
+    if @delimiter && (remainder = @buffer.flush)
+      @logger.trace("Flushing #{remainder.bytesize}B of buffered data") if @logger.trace?
+      handle(remainder, &block) unless remainder.empty?
     end
   end
 
@@ -218,10 +245,16 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     end
 
     # Use a scanning parser to capture the HEADER_FIELDS
-    unprocessed_data = data
-    @header_fields.each do |field_name|
-      match_data = HEADER_SCANNER.match(unprocessed_data)
-      break if match_data.nil? # missing fields
+    unprocessed_data = data.chomp
+    if unprocessed_data.include?(LITERAL_NEWLINE)
+      fail("message is not valid CEF because it contains unescaped newline characters; " +
+           "use the `delimiter` setting to enable in-codec buffering and delimiter-splitting")
+    end
+    @header_fields.each_with_index do |field_name, idx|
+      match_data = HEADER_NEXT_FIELD_PATTERN.match(unprocessed_data)
+      if match_data.nil?
+        fail("message is not valid CEF; found #{idx} of 7 required pipe-terminated header fields")
+      end
 
       escaped_field_value = match_data[1]
       next if escaped_field_value.nil?
@@ -248,11 +281,14 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     event.set(cef_version_field, delete_cef_prefix(event.get(cef_version_field)))
 
     # Use a scanning parser to capture the Extension Key/Value Pairs
-    if message && message.include?('=')
+    if message && !message.empty?
       message = message.strip
       extension_fields = {}
 
-      message.scan(EXTENSION_KEY_VALUE_SCANNER) do |extension_field_key, raw_extension_field_value|
+      while (match = message.match(EXTENSION_NEXT_KEY_VALUE_PATTERN))
+        extension_field_key, raw_extension_field_value = match.captures
+        message = match.post_match
+
         # expand abbreviated extension field keys
         extension_field_key = @decode_mapping.fetch(extension_field_key, extension_field_key)
 
@@ -260,9 +296,12 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
         extension_field_key = extension_field_key.sub(EXTENSION_KEY_ARRAY_CAPTURE, '[\1]\2') if extension_field_key.end_with?(']')
 
         # process legal extension field value escapes
-        extension_field_value = raw_extension_field_value.gsub(EXTENSION_VALUE_ESCAPE_CAPTURE, '\1')
+        extension_field_value = desanitize_extension_val(raw_extension_field_value)
 
         extension_fields[extension_field_key] = extension_field_value
+      end
+      if !message.empty?
+        fail("invalid extensions; keyless value present `#{message}`")
       end
 
       # in ECS mode, normalize timestamps including timezone.
@@ -283,7 +322,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     yield event
   rescue => e
     @logger.error("Failed to decode CEF payload. Generating failure event with payload in message field.",
-                  :exception => e.class, :message => e.message, :backtrace => e.backtrace, :original_data => original_data)
+                  log_metadata(:original_data => original_data))
     yield event_factory.new_event("message" => data, "tags" => ["_cefparsefailure"])
   end
 
@@ -330,6 +369,19 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     ].map(&:freeze).freeze
     # the @syslog_header is the field name used when a syslog header preceeds the CEF Version.
     @syslog_header = ecs_select[disabled:'syslog',v1:'[log][syslog][header]']
+  end
+
+  ##
+  # produces log metadata, injecting the current exception and log-level-relevant backtraces
+  # @param context [Hash{Symbol=>Object}]: the base context
+  def log_metadata(context={})
+    return context unless $!
+
+    exception_context = {}
+    exception_context[:exception] = "#{$!.class}: #{$!.message}"
+    exception_context[:backtrace] = $!.backtrace if @logger.debug?
+
+    exception_context.merge(context)
   end
 
   class CEFField
@@ -545,6 +597,10 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     value.to_s
          .gsub("\r\n", "\n")
          .gsub(EXTENSION_VALUE_SANITIZER_PATTERN, EXTENSION_VALUE_SANITIZER_MAPPING)
+  end
+
+  def desanitize_extension_val(value)
+    value.to_s.gsub(EXTENSION_VALUE_SANITIZER_REVERSE_PATTERN, EXTENSION_VALUE_SANITIZER_REVERSE_MAPPING)
   end
 
   def normalize_timestamp(value, device_timezone_name)

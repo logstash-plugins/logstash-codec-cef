@@ -409,14 +409,16 @@ describe LogStash::Codecs::CEF do
     # @yieldparam event [Event]
     # @yieldreturn [void]
     # @return [Event]
-    def decode_one(codec, data)
-      events = do_decode(codec, data)
+    def decode_one(codec, data, flush: true, &block)
+      events = do_decode(codec, data, flush: flush)
       fail("Expected one event, got #{events.size} events: #{events.inspect}") unless events.size == 1
       event = events.first
 
-      if block_given?
-        aggregate_failures('decode one') do
-          yield event
+      if block
+        enriched_event_validation(event) do |e|
+          aggregate_failures('decode one') do
+            yield e
+          end
         end
       end
 
@@ -434,15 +436,34 @@ describe LogStash::Codecs::CEF do
     # @yieldparam event [Event]
     # @yieldreturn [void]
     # @return [Array<Event>]
-    def do_decode(codec, data)
+    def do_decode(codec, data, flush: true, &block)
       events = []
       codec.decode(data) do |event|
         events << event
       end
+      flush && codec.flush do |event|
+        events << event
+      end
 
-      events.each { |event| yield event } if block_given?
+      if block
+        events.each do |event|
+          enriched_event_validation(event, &block)
+        end
+      end
 
       events
+    end
+
+    ##
+    # Enrich event validation by outputting the serialized event to stderr
+    # if-and-only-if the provided block's rspec expectations are not met.
+    #
+    # @param event [#to_hash_with_metadata]
+    def enriched_event_validation(event)
+      yield(event)
+    rescue RSpec::Expectations::ExpectationNotMetError
+      $stderr.puts("\e[35m#{event.to_hash_with_metadata}\e[0m\n")
+      raise
     end
   end
 
@@ -452,7 +473,7 @@ describe LogStash::Codecs::CEF do
         allow_any_instance_of(described_class).to receive(:ecs_compatibility).and_return(ecs_compatibility)
       end
 
-      let (:message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+      let(:message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
 
       include DecodeHelpers
 
@@ -465,15 +486,124 @@ describe LogStash::Codecs::CEF do
         # Related: https://github.com/elastic/logstash/issues/1645
         subject(:codec) { LogStash::Codecs::CEF.new("delimiter" => '\r\n') }
 
+        let(:message_two) { "CEF:0|fun|whimsy|1.0|100|trojan successfully stopped|10|src=10.0.0.192 dst=12.121.122.82 spt=1232" }
+
+        # testing implicit flush when
         it "should parse on the delimiter " do
-          do_decode(subject,message) do |e|
+          do_decode(subject, message, flush: false) do |e|
             raise Exception.new("Should not get here. If we do, it means the decoder emitted an event before the delimiter was seen?")
           end
 
-          decode_one(subject, "\r\n") do |e|
+          # the delimiter's presence flushes what we already received, but not the new bytes we send
+          decode_one(subject, "\r\n#{message_two}", flush: false) do |e|
             validate(e)
             insist { e.get(ecs_select[disabled: "deviceVendor", v1:"[observer][vendor]"]) } == "security"
             insist { e.get(ecs_select[disabled: "deviceProduct", v1:"[observer][product]"]) } == "threatmanager"
+          end
+
+          # allowing a flush emits the buffered event with our new bits appended
+          decode_one(subject, " split=perfect", flush: true) do |e|
+            validate(e)
+            insist { e.get(ecs_select[disabled: "deviceVendor", v1:"[observer][vendor]"]) } == "fun"
+            insist { e.get(ecs_select[disabled: "deviceProduct", v1:"[observer][product]"]) } == "whimsy"
+            insist { e.get("split") } == "perfect"
+          end
+        end
+
+        it 'flushes on close' do
+          # message does NOT have delimiter, but we still get our event
+          decode_one(subject, message, flush: true) do |e|
+            validate(e)
+            insist { e.get(ecs_select[disabled: "deviceVendor", v1:"[observer][vendor]"]) } == "security"
+            insist { e.get(ecs_select[disabled: "deviceProduct", v1:"[observer][product]"]) } == "threatmanager"
+          end
+        end
+
+        it 'emits multiple from a single decode operation' do
+          events = do_decode(subject, "#{message}\r\n#{message_two}")
+          expect(events.size).to eq(2)
+
+          enriched_event_validation(events[0]) do |event|
+            validate(event)
+            insist { event.get(ecs_select[disabled: "deviceVendor", v1:"[observer][vendor]"]) } == "security"
+            insist { event.get(ecs_select[disabled: "deviceProduct", v1:"[observer][product]"]) } == "threatmanager"
+          end
+
+          enriched_event_validation(events[1]) do |event|
+            validate(event)
+            insist { event.get(ecs_select[disabled: "deviceVendor", v1:"[observer][vendor]"]) } == "fun"
+            insist { event.get(ecs_select[disabled: "deviceProduct", v1:"[observer][product]"]) } == "whimsy"
+          end
+        end
+      end
+
+      # CEF requires seven pipe-terminated headers before optional extensions
+      context 'with a non-CEF payload' do
+        let(:logger_stub) { double('Logger').as_null_object }
+        before(:each) do
+          allow_any_instance_of(described_class).to receive(:logger).and_return(logger_stub)
+        end
+
+        context 'containing 0 header-like sections' do
+          let(:message) { 'this is not cef' }
+          it 'logs helpfully and produces a tagged event' do
+            do_decode(subject,message) do |event|
+              expect(event.get('tags')).to include('_cefparsefailure')
+              expect(event.get('message')).to eq(message)
+            end
+            expect(logger_stub).to have_received(:error)
+                                     .with(a_string_including('Failed to decode CEF payload. Generating failure event with payload in message field'),
+                                           a_hash_including(exception: a_string_including("found 0 of 7 required pipe-terminated header fields"),
+                                                            original_data: message))
+          end
+        end
+        context 'containing 4 header-like sections' do
+          let(:message) { "a|b|c with several \\| escaped\\| pipes|d|bananas" }
+          it 'logs helpfully and produces a tagged event' do
+            do_decode(subject,message) do |event|
+              expect(event.get('tags')).to include('_cefparsefailure')
+              expect(event.get('message')).to eq(message)
+            end
+            expect(logger_stub).to have_received(:error)
+                                     .with(a_string_including('Failed to decode CEF payload. Generating failure event with payload in message field'),
+                                           a_hash_including(exception: a_string_including("found 4 of 7 required pipe-terminated header fields"),
+                                                            original_data: message))
+          end
+        end
+        context 'containing non-key/value extensions' do
+          let (:message) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|this is in the extensions space but it is not valid because it is not equals-separated key/value" }
+          it 'logs helpfully and produces a tagged event' do
+            do_decode(subject,message) do |event|
+              expect(event.get('tags')).to include('_cefparsefailure')
+              expect(event.get('message')).to eq(message)
+            end
+            expect(logger_stub).to have_received(:error)
+                                     .with(a_string_including('Failed to decode CEF payload. Generating failure event with payload in message field'),
+                                           a_hash_including(exception: a_string_including("invalid extensions; keyless value present"),
+                                                            original_data: message))
+          end
+        end
+        context 'containing unescaped newlines' do
+          # when not using a `delimiter`, we expect exactly one CEF log per call to decode.
+          let (:message) {
+            <<~EOMESSAGE
+              CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.67
+              CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.67
+              CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.67
+              CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.67
+              CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|src=10.0.0.67
+            EOMESSAGE
+          }
+          it 'logs helpfully and produces a tagged event' do
+            do_decode(subject, message) do |event|
+              expect(event.get('tags')).to include('_cefparsefailure')
+              expect(event.get('message')).to eq(message)
+            end
+            expect(logger_stub).to have_received(:error)
+                                     .with(a_string_including('Failed to decode CEF payload. Generating failure event with payload in message field'),
+                                           a_hash_including(exception: a_string_including("message is not valid CEF because it contains unescaped newline characters",
+                                                                                          "use the `delimiter` setting to enable in-codec buffering and delimiter-splitting"),
+                                                            original_data: message))
           end
         end
       end
@@ -545,6 +675,23 @@ describe LogStash::Codecs::CEF do
       it "should be OK with equal in the message" do
         decode_one(subject, equal_in_message) do |e|
           insist { e.get("moo") } == 'this =has = equals='
+        end
+      end
+
+      let(:literal_newline)         { "\n" }
+      let(:literal_carriage_return) { "\r" }
+      let(:literal_equals)          { "=" }
+      let(:literal_backslash)       { "\\" }
+      let(:escaped_newline)         { literal_backslash + 'n' }
+      let(:escaped_carriage_return) { literal_backslash + 'r' }
+      let(:escaped_equals)          { literal_backslash + literal_equals }
+      let(:escaped_backslash)       { literal_backslash + literal_backslash }
+      let(:escaped_sequences_in_extension_value) { "CEF:0|security|threatmanager|1.0|100|trojan successfully stopped|10|foo=bar msg=this message has escaped equals #{escaped_equals} and escaped newlines #{escaped_newline} escaped carriage returns #{escaped_carriage_return} and escaped backslashes #{escaped_backslash} in it bar=baz" }
+      it "decodes embedded newlines, carriage regurns, backslashes, and equals signs" do
+        decode_one(subject, escaped_sequences_in_extension_value) do |e|
+          insist { e.get("foo") } == 'bar'
+          insist { e.get("message") } == "this message has escaped equals #{literal_equals} and escaped newlines #{literal_newline} escaped carriage returns #{literal_carriage_return} and escaped backslashes #{literal_backslash} in it"
+          insist { e.get("bar") } == 'baz'
         end
       end
 

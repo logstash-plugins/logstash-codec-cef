@@ -84,9 +84,6 @@ class LogStash::Codecs::CEF::TimestampNormalizer
 
     # Ruby's `Time::at(sec, microseconds_with_frac)`
     Time.at(parsed_time.get_epoch_second, Rational(parsed_time.get_nano, 1000))
-  rescue => e
-    $stderr.puts "parse_cef_format_sgring(#{value.inspect}, #{context_timezone.inspect}) #!=> #{e.message}"
-    raise
   end
 
   def resolve_assuming_year(parsed_temporal_accessor)
