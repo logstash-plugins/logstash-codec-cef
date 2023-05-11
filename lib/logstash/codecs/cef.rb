@@ -201,7 +201,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
     end
 
     require_relative 'cef/timestamp_normalizer'
-    @timestamp_normalzer = TimestampNormalizer.new(locale: @locale, timezone: @default_timezone)
+    @timestamp_normalizer = TimestampNormalizer.new(locale: @locale, timezone: @default_timezone)
 
     generate_header_fields!
     generate_mappings!
@@ -604,9 +604,11 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
   end
 
   def normalize_timestamp(value, device_timezone_name)
-    value = @timestamp_normalzer.normalize(value, device_timezone_name).iso8601(9)
+    return nil if value.nil? || value.to_s.strip.empty?
 
-    LogStash::Timestamp.new(value)
+    normalized = @timestamp_normalizer.normalize(value, device_timezone_name).iso8601(9)
+
+    LogStash::Timestamp.new(normalized)
   rescue => e
     @logger.error("Failed to parse CEF timestamp value `#{value}` (#{e.message})")
     raise InvalidTimestamp.new("Not a valid CEF timestamp: `#{value}`")
