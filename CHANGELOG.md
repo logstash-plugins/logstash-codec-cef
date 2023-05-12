@@ -1,3 +1,6 @@
+## 6.2.7
+ - Fix: when decoding in an ecs_compatibility mode, timestamp-normalized fields now handle provided-but-empty values [#102](https://github.com/logstash-plugins/logstash-codec-cef/issues/102)
+
 ## 6.2.6
  - Fix: when decoding, escaped newlines and carriage returns in extension values are now correctly decoded into literal newlines and carriage returns respectively [#98](https://github.com/logstash-plugins/logstash-codec-cef/pull/98)
  - Fix: when decoding, non-CEF payloads are identified and intercepted to prevent data-loss and corruption. They now cause a descriptive log message to be emitted, and are emitted as their own `_cefparsefailure`-tagged event containing the original bytes in its `message` field [#99](https://github.com/logstash-plugins/logstash-codec-cef/issues/99)

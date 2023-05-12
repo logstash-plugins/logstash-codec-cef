@@ -721,6 +721,26 @@ describe LogStash::Codecs::CEF do
         end
       end
 
+      context "timestamp-normalized fields" do
+        context 'empty values' do
+          let(:message_with_empty_start) { %Q{CEF:0|Security|threatmanager|1.0|100|worm successfully stopped|Very-High| eventId=1 msg=Worm successfully stopped start=} }
+          if ecs_select.active_mode == :disabled
+            it 'leaves the empty value in-tact' do
+              decode_one(subject, message_with_empty_start) do |event|
+                expect(event.get('startTime')).to eq('')
+              end
+            end
+          else
+            it 'stores a nil value' do
+              decode_one(subject, message_with_empty_start) do |event|
+                expect(event).to include '[event][start]'
+                expect(event.get('[event][start]')).to be nil
+              end
+            end
+          end
+        end
+      end
+
       let(:malformed_unescaped_equals_in_extension_value) { %q{CEF:0|FooBar|Web Gateway|1.2.3.45.67|200|Success|2|rt=Sep 07 2018 14:50:39 cat=Access Log dst=1.1.1.1 dhost=foo.example.com suser=redacted src=2.2.2.2 requestMethod=POST request='https://foo.example.com/bar/bingo/1' requestClientApplication='Foo-Bar/2018.1.7; Email:user@example.com; Guid:test=' cs1= cs1Label=Foo Bar} }
       it 'should split correctly' do
         decode_one(subject, malformed_unescaped_equals_in_extension_value) do |event|
