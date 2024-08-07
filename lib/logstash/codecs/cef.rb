@@ -271,7 +271,8 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
     # Try and parse out the syslog header if there is one
     cef_version_field = @header_fields[0]
-    if (cef_version = event.get(cef_version_field)).include?(' ')
+    cef_version = event.get(cef_version_field)
+    if cef_version && cef_version.include?(' ')
       split_cef_version = cef_version.rpartition(' ')
       event.set(@syslog_header, split_cef_version[0])
       event.set(cef_version_field, split_cef_version[2])
