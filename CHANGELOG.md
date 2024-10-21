@@ -1,5 +1,5 @@
 ## 6.2.8
- - [Doc] Added `raw_data_field` to docs.
+ - [Doc] Added `raw_data_field` to docs. [#105](https://github.com/logstash-plugins/logstash-codec-cef/pull/105)
 
 ## 6.2.7
  - Fix: when decoding in an ecs_compatibility mode, timestamp-normalized fields now handle provided-but-empty values [#102](https://github.com/logstash-plugins/logstash-codec-cef/issues/102)
