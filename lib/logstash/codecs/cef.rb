@@ -310,6 +310,7 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
         @timestamp_fields.each do |timestamp_field_name|
           raw_timestamp = extension_fields.delete(timestamp_field_name) or next
           value = normalize_timestamp(raw_timestamp, device_timezone)
+          next if value.nil?
           event.set(timestamp_field_name, value)
         end
       end
@@ -605,10 +606,11 @@ class LogStash::Codecs::CEF < LogStash::Codecs::Base
 
   def normalize_timestamp(value, device_timezone_name)
     return nil if value.nil? || value.to_s.strip.empty?
-
-    normalized = @timestamp_normalizer.normalize(value, device_timezone_name).iso8601(9)
-
-    LogStash::Timestamp.new(normalized)
+  
+    normalized = @timestamp_normalizer.normalize(value, device_timezone_name)
+    return nil if normalized.nil?
+  
+    LogStash::Timestamp.new(normalized.iso8601(9))
   rescue => e
     @logger.error("Failed to parse CEF timestamp value `#{value}` (#{e.message})")
     raise InvalidTimestamp.new("Not a valid CEF timestamp: `#{value}`")

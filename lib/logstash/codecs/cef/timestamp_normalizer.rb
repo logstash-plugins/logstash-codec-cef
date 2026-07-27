@@ -35,30 +35,35 @@ class LogStash::Codecs::CEF::TimestampNormalizer
                                        .withLocale(java_locale)
   end
 
-  INTEGER_OR_DECIMAL_PATTERN = /\A[1-9][0-9]*(?:\.[0-9]+)?\z/
+  INTEGER_OR_DECIMAL_PATTERN = /\A-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?\z/
   private_constant :INTEGER_OR_DECIMAL_PATTERN
 
-  # @param value [String,Time,Numeric]
-  #   The value to parse. `Time`s are returned without modification, and `Numeric` values
-  #   are treated as millis-since-epoch (as are fully-numeric strings).
-  #   Strings are parsed unsing any of the supported CEF formats, and when the timestamp
-  #   does not encode a year, we assume the year from contextual information like the
-  #   current time.
-  # @param device_timezone_name [String,nil] (optional):
+  # @param value [String, Time, Numeric]
+  #   The value to parse. `Time` values are returned without modification.
+  #   Numeric values and fully-numeric strings are treated as milliseconds-since-epoch.
+  #   If the numeric value is less than or equal to zero, `nil` is returned.
+  #   Non-numeric strings are parsed using any of the supported CEF timestamp formats.
+  #   When the timestamp does not encode a year, the year is assumed from contextual
+  #   information like the current time.
+  #
+  # @param device_timezone_name [String, nil] (optional)
   #   If known, the time-zone or UTC offset of the device that encoded the timestamp.
   #   This value is used to determine the offset when no offset is encoded in the timestamp.
   #   If not provided, the system default time zone is used instead.
-  # @return [Time]
-  def normalize(value, device_timezone_name=nil)
-    return value if value.kind_of?(Time)
+  #
+  # @return [Time, nil]
 
-    case value
-    when Numeric                    then Time.at(Rational(value, 1000))
-    when INTEGER_OR_DECIMAL_PATTERN then Time.at(Rational(value, 1000))
+  def normalize(value, device_timezone_name = nil)
+    return value if value.is_a?(Time)
+  
+    if value.is_a?(Numeric) || value.to_s =~ INTEGER_OR_DECIMAL_PATTERN
+      return nil if value.to_f <= 0
+      return Time.at(Rational(value, 1000))
     else
-      parse_cef_format_string(value.to_s, device_timezone_name)
+      return parse_cef_format_string(value.to_s, device_timezone_name)
     end
   end
+  
 
   private
 
